@@ -1,0 +1,93 @@
+/*
+ * App Global CSS
+ * ----------------------------------------------------------------------------
+ * Put style rules here that you want to apply globally. These styles are for
+ * the entire app and not just one component.
+ */
+
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
+* {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.expense-amount {
+  color: var(--ion-color-danger);
+  font-weight: 600;
+}
+
+.income-amount {
+  color: var(--ion-color-success);
+  font-weight: 600;
+}
+
+.category-badge {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-icon {
+  font-size: 18px;
+  &.pending {
+    color: var(--ion-color-warning);
+  }
+  &.ready {
+    color: var(--ion-color-primary);
+  }
+  &.synced {
+    color: var(--ion-color-success);
+  }
+  &.error {
+    color: var(--ion-color-danger);
+  }
+}
+
+ion-modal.transaction-overlay {
+  --border-radius: 16px 16px 0 0;
+
+  &::part(backdrop) {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  &::part(handle) {
+    display: none;
+  }
+}
+
+.stats-card {
+  ion-card-content {
+    display: flex;
+    justify-content: space-around;
+    padding: 16px;
+  }
+
+  .stat-item {
+    text-align: center;
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ion-color-primary);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--ion-color-medium);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+}

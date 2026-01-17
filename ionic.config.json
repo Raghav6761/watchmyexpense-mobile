@@ -1,0 +1,12 @@
+{
+  "name": "payment-tracker",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular",
+  "project": "payment-tracker",
+  "serve": {
+    "open": false,
+    "port": 8100
+  }
+}

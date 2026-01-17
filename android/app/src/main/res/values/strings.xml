@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Watch My Expense</string>
+    <string name="title_activity_main">Watch My Expense</string>
+    <string name="package_name">com.watchmyexpense.app</string>
+    <string name="custom_url_scheme">com.watchmyexpense.app</string>
+</resources>

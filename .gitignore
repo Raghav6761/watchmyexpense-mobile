@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+www/
+dist/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Angular
+.angular/
+
+# Capacitor - keep android folder but ignore build artifacts
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/build/
+
+# APK outputs
+*.apk
+*.aab
+
+# Logs
+*.log
+npm-debug.log*
