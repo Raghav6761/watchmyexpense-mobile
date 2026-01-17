@@ -1,0 +1,39 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to DigitalOcean
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: root
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            cd /var/www/watchmyexpense-mobile
+
+            # Pull latest code (or clone if first time)
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/Raghav6761/watchmyexpense-mobile.git .
+            fi
+
+            # Install dependencies
+            npm install
+
+            # Build the app (with memory limit to avoid crashes)
+            NODE_OPTIONS="--max_old_space_size=768" npm run build
+
+            # Restart the PM2 serve process
+            pm2 restart watchmyexpense-mobile
+            pm2 save
+
+            echo "Deployed successfully!"
