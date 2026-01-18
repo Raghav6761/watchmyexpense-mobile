@@ -22,10 +22,8 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
-  serverOutline,
   logInOutline,
   logOutOutline,
-  refreshOutline,
   trashOutline,
   cloudDoneOutline,
   cloudOfflineOutline,
@@ -103,31 +101,6 @@ import { Capacitor } from '@capacitor/core';
             <h2>Google Sheets</h2>
             <p>{{ syncService.isAuthenticated() ? 'Connected' : 'Not connected' }}</p>
           </ion-label>
-        </ion-item>
-      </ion-list>
-
-      <!-- Backend Configuration -->
-      <ion-list>
-        <ion-list-header>
-          <ion-label>Backend Server</ion-label>
-        </ion-list-header>
-
-        <ion-item>
-          <ion-icon name="server-outline" slot="start"></ion-icon>
-          <ion-input
-            label="Server URL"
-            labelPlacement="stacked"
-            [(ngModel)]="backendUrl"
-            placeholder="http://localhost:3000"
-            (ionBlur)="saveBackendUrl()"
-          ></ion-input>
-        </ion-item>
-
-        <ion-item>
-          <ion-button fill="outline" (click)="testConnection()">
-            <ion-icon name="refresh-outline" slot="start"></ion-icon>
-            Test Connection
-          </ion-button>
         </ion-item>
       </ion-list>
 
@@ -299,7 +272,6 @@ export class SettingsPage {
   public syncService = inject(SyncService);
   private smsListener = inject(SmsListenerService);
 
-  backendUrl = '';
   sheetPattern = '';
   isAndroid = false;
   hasOverlayPermission = false;
@@ -312,10 +284,8 @@ export class SettingsPage {
 
   constructor() {
     addIcons({
-      serverOutline,
       logInOutline,
       logOutOutline,
-      refreshOutline,
       trashOutline,
       cloudDoneOutline,
       cloudOfflineOutline,
@@ -327,7 +297,6 @@ export class SettingsPage {
       saveOutline
     });
 
-    this.backendUrl = this.storage.backendUrl();
     this.sheetPattern = this.storage.sheetNamePattern();
   }
 
@@ -367,13 +336,6 @@ export class SettingsPage {
     setTimeout(() => this.checkOverlayPermission(), 2000);
   }
 
-  async saveBackendUrl() {
-    if (this.backendUrl && this.backendUrl !== this.storage.backendUrl()) {
-      await this.storage.setBackendUrl(this.backendUrl);
-      await this.showToast('Server URL saved', 'success');
-    }
-  }
-
   async saveSheetPattern() {
     if (!this.isPatternValid) {
       await this.showToast('Pattern must include {month} and {year}', 'warning');
@@ -388,18 +350,6 @@ export class SettingsPage {
       // Save locally even if backend fails
       await this.storage.setSheetNamePattern(this.sheetPattern);
       await this.showToast('Pattern saved locally (backend unreachable)', 'warning');
-    }
-  }
-
-  async testConnection() {
-    const isReachable = await this.syncService.healthCheck();
-
-    if (isReachable) {
-      await this.showToast('Server is reachable!', 'success');
-      // Also refresh auth status
-      await this.syncService.checkAuthStatus();
-    } else {
-      await this.showToast('Cannot reach server. Check the URL.', 'danger');
     }
   }
 

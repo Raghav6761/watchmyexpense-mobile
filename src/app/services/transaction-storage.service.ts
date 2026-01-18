@@ -26,7 +26,7 @@ export class TransactionStorageService {
     expense: DEFAULT_EXPENSE_CATEGORIES,
     income: DEFAULT_INCOME_CATEGORIES
   });
-  private _backendUrl = signal<string>('http://localhost:3000');
+  private _backendUrl = signal<string>('https://api.watchmyexpense.com');
   private _sheetNamePattern = signal<string>('Monthly budget {month} {year}');
 
   // Public readonly signals
