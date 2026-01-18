@@ -83,7 +83,7 @@ import { Transaction } from '../../models/transaction.model';
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Payment Tracker</ion-title>
+        <ion-title>Watch My Expense</ion-title>
         <ion-buttons slot="end">
           @if (isDevMode) {
             <ion-button (click)="simulateTransaction()" title="Simulate SMS">
@@ -368,11 +368,16 @@ export class HomePage implements OnInit {
   }
 
   async ngOnInit() {
-    // Check auth status
-    this.syncService.checkAuthStatus();
+    // Check auth status and fetch categories
+    await this.syncService.checkAuthStatus();
 
-    // Try to fetch categories
-    this.syncService.fetchCategories();
+    // Fetch categories from backend
+    const categories = await this.syncService.fetchCategories();
+    if (categories) {
+      console.log('[HomePage] Categories loaded successfully');
+    } else {
+      console.warn('[HomePage] Failed to fetch categories, using defaults');
+    }
   }
 
   async showTransactionOverlay(transaction: Transaction, isEditing: boolean) {

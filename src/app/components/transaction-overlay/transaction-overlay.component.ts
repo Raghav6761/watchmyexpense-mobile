@@ -384,6 +384,15 @@ export class TransactionOverlayComponent implements OnInit {
     this.source = this.transaction.source || '';
     this.selectedCategory = this.transaction.category || '';
 
+    // Debug: Log available categories
+    const allCategories = this.storage.categories();
+    console.log('[TransactionOverlay] Available categories:', {
+      type: this.transaction.type,
+      expenseCount: allCategories.expense?.length || 0,
+      incomeCount: allCategories.income?.length || 0,
+      currentCategories: this.currentCategories()
+    });
+
     // Generate suggested categories
     this.generateSuggestions();
   }

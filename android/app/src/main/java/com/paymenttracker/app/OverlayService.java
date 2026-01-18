@@ -99,7 +99,7 @@ public class OverlayService extends Service {
         );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Payment Tracker")
+            .setContentTitle("Watch My Expense")
             .setContentText("Processing transaction...")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)

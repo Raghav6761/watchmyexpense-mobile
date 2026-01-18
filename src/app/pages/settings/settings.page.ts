@@ -117,6 +117,13 @@ import { Capacitor } from '@capacitor/core';
             Test Connection
           </ion-button>
         </ion-item>
+
+        <ion-item>
+          <ion-button fill="outline" (click)="fetchCategories()">
+            <ion-icon name="layers-outline" slot="start"></ion-icon>
+            Fetch Categories
+          </ion-button>
+        </ion-item>
       </ion-list>
 
       <!-- Authentication -->
@@ -240,7 +247,7 @@ import { Capacitor } from '@capacitor/core';
         <ion-item>
           <ion-icon name="information-circle-outline" slot="start"></ion-icon>
           <ion-label>
-            <h2>Payment Tracker</h2>
+            <h2>Watch My Expense</h2>
             <p>Version 1.0.0</p>
             <p>Automatically track payments from SMS</p>
           </ion-label>
@@ -346,7 +353,7 @@ export class SettingsPage {
   async requestOverlayPermission() {
     console.log('Requesting overlay permission...');
     await this.smsListener.requestOverlayPermission();
-    await this.showToast('Please enable "Display over other apps" for Payment Tracker', 'primary');
+    await this.showToast('Please enable "Display over other apps" for Watch My Expense', 'primary');
 
     // Check permission again after a delay (user returns from settings)
     setTimeout(() => this.checkOverlayPermission(), 2000);
@@ -378,6 +385,17 @@ export class SettingsPage {
       await this.syncService.checkAuthStatus();
     } else {
       await this.showToast('Cannot reach server.', 'danger');
+    }
+  }
+
+  async fetchCategories() {
+    const categories = await this.syncService.fetchCategories();
+    if (categories) {
+      const expenseCount = categories.expense?.length || 0;
+      const incomeCount = categories.income?.length || 0;
+      await this.showToast(`Categories fetched! Expense: ${expenseCount}, Income: ${incomeCount}`, 'success');
+    } else {
+      await this.showToast('Failed to fetch categories', 'danger');
     }
   }
 
