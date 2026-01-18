@@ -399,21 +399,31 @@ export class TransactionOverlayComponent implements OnInit {
 
   private generateSuggestions() {
     const suggested: string[] = [];
+    const availableCategories = this.currentCategories();
 
     // Try to auto-suggest from merchant name
     const autoSuggested = this.smsParser.suggestCategory(this.transaction.merchant);
-    if (autoSuggested) {
+    if (autoSuggested && availableCategories.includes(autoSuggested)) {
       suggested.push(autoSuggested);
     }
 
-    // Add most common categories as quick options
+    // Add most common categories as quick options (only if they exist)
     const commonCategories = this.transaction.type === 'expense'
       ? ['Food', 'Transport', 'Shopping', 'Bills & Utilities', 'Other']
       : ['Paycheck', 'Refund', 'Other'];
 
     for (const cat of commonCategories) {
-      if (!suggested.includes(cat) && suggested.length < 5) {
+      if (!suggested.includes(cat) && availableCategories.includes(cat) && suggested.length < 5) {
         suggested.push(cat);
+      }
+    }
+
+    // If we don't have enough suggestions, add the first few actual categories
+    if (suggested.length < 5) {
+      for (const cat of availableCategories) {
+        if (!suggested.includes(cat) && suggested.length < 5) {
+          suggested.push(cat);
+        }
       }
     }
 
