@@ -24,6 +24,7 @@ import { addIcons } from 'ionicons';
 import {
   logInOutline,
   logOutOutline,
+  refreshOutline,
   trashOutline,
   cloudDoneOutline,
   cloudOfflineOutline,
@@ -101,6 +102,20 @@ import { Capacitor } from '@capacitor/core';
             <h2>Google Sheets</h2>
             <p>{{ syncService.isAuthenticated() ? 'Connected' : 'Not connected' }}</p>
           </ion-label>
+        </ion-item>
+      </ion-list>
+
+      <!-- Backend Server -->
+      <ion-list>
+        <ion-list-header>
+          <ion-label>Backend Server</ion-label>
+        </ion-list-header>
+
+        <ion-item>
+          <ion-button fill="outline" (click)="testConnection()">
+            <ion-icon name="refresh-outline" slot="start"></ion-icon>
+            Test Connection
+          </ion-button>
         </ion-item>
       </ion-list>
 
@@ -286,6 +301,7 @@ export class SettingsPage {
     addIcons({
       logInOutline,
       logOutOutline,
+      refreshOutline,
       trashOutline,
       cloudDoneOutline,
       cloudOfflineOutline,
@@ -350,6 +366,18 @@ export class SettingsPage {
       // Save locally even if backend fails
       await this.storage.setSheetNamePattern(this.sheetPattern);
       await this.showToast('Pattern saved locally (backend unreachable)', 'warning');
+    }
+  }
+
+  async testConnection() {
+    const isReachable = await this.syncService.healthCheck();
+
+    if (isReachable) {
+      await this.showToast('Server is reachable!', 'success');
+      // Also refresh auth status
+      await this.syncService.checkAuthStatus();
+    } else {
+      await this.showToast('Cannot reach server.', 'danger');
     }
   }
 
