@@ -63,6 +63,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
       // Process any SMS that arrived while app was killed
       await this.processPendingSms();
+
+      // Process any overlay updates from when app was killed
+      await this.processPendingOverlayUpdates();
     }
 
     // Subscribe to new transactions from SMS - this works from any screen
@@ -80,6 +83,15 @@ export class AppComponent implements OnInit, OnDestroy {
       (update) => this.handleOverlayUpdate(update)
     );
 
+    // Check auth status and fetch categories on startup
+    await this.syncService.checkAuthStatus();
+    console.log('[AppInit] Auth status:', this.syncService.isAuthenticated());
+    if (this.syncService.isAuthenticated()) {
+      console.log('[AppInit] Fetching categories from backend...');
+      const categories = await this.syncService.fetchCategories();
+      console.log('[AppInit] Categories fetched:', categories ? 'success' : 'failed (using cached/defaults)');
+    }
+
     // Listen for app resume
     App.addListener('appStateChange', async ({ isActive }) => {
       if (isActive) {
@@ -87,6 +99,10 @@ export class AppComponent implements OnInit, OnDestroy {
         // Refresh auth status first (in case token expired or refreshed)
         await this.syncService.checkAuthStatus();
         console.log('[AppState] Auth status refreshed:', this.syncService.isAuthenticated());
+        // Refresh categories from backend (also syncs to native overlay)
+        if (this.syncService.isAuthenticated()) {
+          await this.syncService.fetchCategories();
+        }
         // Process any transactions detected while app was in background
         await this.processPendingTransactions();
         // Then process any pending overlay updates
@@ -201,23 +217,55 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private async handleNewTransaction(parsed: ParsedSms) {
+    const startTime = Date.now();
+    console.log('[AppComponent] handleNewTransaction called:', {
+      merchant: parsed.merchant,
+      amount: parsed.amount,
+      type: parsed.type,
+      timestamp: new Date().toISOString()
+    });
+
     // Create transaction from parsed SMS
     const transaction = this.storage.createFromParsedSms(parsed);
+    console.log('[AppComponent] Transaction created:', {
+      id: transaction.id,
+      amount: transaction.amount,
+      type: transaction.type,
+      category: transaction.category
+    });
 
     // Add to storage
     await this.storage.addTransaction(transaction);
+    console.log('[AppComponent] Transaction added to storage:', transaction.id);
 
-    if (this.notificationService.isInForeground()) {
+    // Check foreground state and decide modal vs notification
+    const isInForeground = this.notificationService.isInForeground();
+    console.log('[AppComponent] Foreground state decision:', {
+      isInForeground,
+      transactionId: transaction.id,
+      willShowModal: isInForeground,
+      willShowNotification: !isInForeground
+    });
+
+    if (isInForeground) {
       // App in foreground - show in-app modal
+      console.log('[AppComponent] Showing in-app modal for transaction:', transaction.id);
       await this.showTransactionOverlay(transaction.id);
     } else {
       // App in background - show BOTH overlay AND notification
       // Notification stays until user saves from overlay or addresses it
+      console.log('[AppComponent] Showing notification and system overlay for transaction:', transaction.id);
       await this.notificationService.showTransactionNotification(parsed, transaction.id);
 
       // Also try to show system overlay if permission granted
       await this.smsListener.showOverlay(transaction.id, parsed);
     }
+
+    const endTime = Date.now();
+    console.log('[AppComponent] handleNewTransaction completed:', {
+      transactionId: transaction.id,
+      duration: `${endTime - startTime}ms`
+    });
   }
 
   private async handleOverlayUpdate(update: TransactionUpdate) {
@@ -299,25 +347,90 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private async showTransactionOverlay(transactionId: string) {
-    const transaction = this.storage.getTransaction(transactionId);
-    if (!transaction) return;
+    console.log('[AppComponent] showTransactionOverlay called with transactionId:', transactionId);
 
-    const modal = await this.modalCtrl.create({
-      component: TransactionOverlayComponent,
-      componentProps: { transaction, isEditing: false },
-      cssClass: 'transaction-overlay',
-      initialBreakpoint: 0.6,
-      breakpoints: [0, 0.6, 0.85],
-      handleBehavior: 'cycle'
+    // STEP 1: Validate transaction exists
+    const transaction = this.storage.getTransaction(transactionId);
+    if (!transaction) {
+      console.error('[AppComponent] Transaction not found:', transactionId);
+      await this.showToast('Transaction not found', 'danger');
+      return;
+    }
+
+    // STEP 2: Validate transaction data
+    console.log('[AppComponent] Transaction validated:', {
+      id: transaction.id,
+      amount: transaction.amount,
+      type: transaction.type,
+      status: transaction.status,
+      category: transaction.category,
+      description: transaction.description
     });
 
-    await modal.present();
+    if (!transaction.amount || transaction.amount <= 0) {
+      console.error('[AppComponent] Invalid transaction amount:', transaction.amount);
+      await this.showToast('Invalid transaction data', 'danger');
+      return;
+    }
 
-    const { data } = await modal.onDidDismiss();
+    // STEP 3: Log foreground state
+    console.log('[AppComponent] App foreground state:', this.notificationService.isInForeground());
 
-    if (data?.saved) {
-      const message = data.synced ? 'Transaction saved and synced!' : 'Transaction saved.';
-      await this.showToast(message, data.synced ? 'success' : 'medium');
+    // STEP 4: Create modal with error handling
+    let modal: HTMLIonModalElement;
+    try {
+      console.log('[AppComponent] Creating modal for transaction:', transactionId);
+      modal = await this.modalCtrl.create({
+        component: TransactionOverlayComponent,
+        componentProps: { transaction, isEditing: false },
+        cssClass: 'transaction-overlay',
+        initialBreakpoint: 0.6,
+        breakpoints: [0, 0.6, 0.85],
+        handleBehavior: 'cycle'
+      });
+      console.log('[AppComponent] Modal created successfully');
+    } catch (error) {
+      console.error('[AppComponent] Modal creation failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId
+      });
+      await this.showToast('Failed to open transaction overlay. Please try again.', 'danger');
+      return;
+    }
+
+    // STEP 5: Present modal with error handling
+    try {
+      console.log('[AppComponent] Presenting modal for transaction:', transactionId);
+      await modal.present();
+      console.log('[AppComponent] Modal presented successfully');
+    } catch (error) {
+      console.error('[AppComponent] Modal presentation failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId
+      });
+      await this.showToast('Failed to display transaction overlay. Please try again.', 'danger');
+      return;
+    }
+
+    // STEP 6: Wait for dismissal with error handling
+    try {
+      console.log('[AppComponent] Waiting for modal dismissal...');
+      const { data } = await modal.onDidDismiss();
+      console.log('[AppComponent] Modal dismissed with data:', data);
+
+      if (data?.saved) {
+        const message = data.synced ? 'Transaction saved and synced!' : 'Transaction saved.';
+        await this.showToast(message, data.synced ? 'success' : 'medium');
+      }
+    } catch (error) {
+      console.error('[AppComponent] Modal dismissal error:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId
+      });
+      // Don't show toast here - modal might have been dismissed successfully but onDidDismiss threw
     }
   }
 

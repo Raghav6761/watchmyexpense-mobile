@@ -221,8 +221,16 @@ export class SyncService {
    * Sync a single transaction
    */
   async syncTransaction(transaction: Transaction): Promise<boolean> {
+    console.log('[SyncService] Starting sync for transaction:', {
+      id: transaction.id,
+      type: transaction.type,
+      amount: transaction.amount,
+      category: transaction.category,
+      description: transaction.description
+    });
+
     if (!this._isAuthenticated()) {
-      console.error('Not authenticated');
+      console.error('[SyncService] Not authenticated - cannot sync');
       return false;
     }
 
@@ -231,19 +239,26 @@ export class SyncService {
         ? `${this.baseUrl}/api/expense`
         : `${this.baseUrl}/api/income`;
 
-      await firstValueFrom(
-        this.http.post(endpoint, {
-          date: transaction.date.toISOString(),
-          amount: transaction.amount,
-          description: transaction.description,
-          category: transaction.category
-        })
+      const payload = {
+        date: transaction.date.toISOString(),
+        amount: transaction.amount,
+        description: transaction.description,
+        category: transaction.category,
+        source: transaction.source || ''
+      };
+
+      console.log('[SyncService] Sending to:', endpoint);
+      console.log('[SyncService] Payload:', payload);
+
+      const response = await firstValueFrom(
+        this.http.post(endpoint, payload)
       );
 
+      console.log('[SyncService] Sync successful:', response);
       await this.storage.markSynced(transaction.id);
       return true;
     } catch (error) {
-      console.error('Sync error:', error);
+      console.error('[SyncService] Sync error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Sync failed';
       await this.storage.markError(transaction.id, errorMessage);
       return false;

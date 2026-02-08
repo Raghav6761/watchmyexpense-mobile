@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -47,6 +48,7 @@ import { Capacitor } from '@capacitor/core';
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -123,6 +125,14 @@ import { Capacitor } from '@capacitor/core';
             <ion-icon name="layers-outline" slot="start"></ion-icon>
             Fetch Categories
           </ion-button>
+        </ion-item>
+
+        <ion-item button routerLink="/categories">
+          <ion-icon name="layers-outline" slot="start" color="primary"></ion-icon>
+          <ion-label>
+            <h2>View Categories</h2>
+            <p>See all expense and income categories</p>
+          </ion-label>
         </ion-item>
       </ion-list>
 

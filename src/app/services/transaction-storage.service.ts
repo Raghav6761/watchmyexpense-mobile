@@ -60,6 +60,14 @@ export class TransactionStorageService {
     this._transactions().filter(t => t.status === 'ready')
   );
 
+  public expenseCategories = computed(() =>
+    this._categories().expense || []
+  );
+
+  public incomeCategories = computed(() =>
+    this._categories().income || []
+  );
+
   constructor() {
     this.loadFromStorage();
   }

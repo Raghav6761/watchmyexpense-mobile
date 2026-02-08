@@ -107,54 +107,180 @@ export class SmsParserService {
   }
 
   /**
-   * Extract amount from SMS
+   * Extract amount from SMS with multi-pass extraction and scoring
    */
   private extractAmount(message: string): number | null {
-    // Common patterns - order matters, more specific first
-    // Examples: Rs.500.00, Rs 500, Rs.338, INR 270, ₹500, debited by 40
+    console.log('[SmsParser] extractAmount called with message:', message.substring(0, 100));
+
+    // Patterns to extract amounts - using matchAll for multi-pass
     const patterns = [
-      // "Spent INR 270" or "Spent Rs.338" - at start of message
-      /Spent\s+(?:INR|Rs\.?)\s*([\d,]+(?:\.\d{1,2})?)/i,
-      // Standard currency patterns
-      /Rs\.?\s*([\d,]+(?:\.\d{1,2})?)/i,
-      /INR\s*([\d,]+(?:\.\d{1,2})?)/i,
-      /₹\s*([\d,]+(?:\.\d{1,2})?)/,
-      /Rupees?\s*([\d,]+(?:\.\d{1,2})?)/i,
-      // "amount of Rs.X" or "payment of Rs.X"
-      /(?:amount|payment)\s*(?:of\s*)?Rs\.?\s*([\d,]+(?:\.\d{1,2})?)/i,
-      // "debited by 40" - no currency symbol (SBI UPI style)
-      /debited\s+(?:by\s+)?([\d,]+(?:\.\d{1,2})?)/i,
-      // "credited by 40" - no currency symbol
-      /credited\s+(?:by\s+)?([\d,]+(?:\.\d{1,2})?)/i,
+      {
+        name: 'Spent + Currency',
+        regex: /Spent\s+(?:INR|Rs\.?)\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 100
+      },
+      {
+        name: 'Debited by',
+        regex: /debited\s+(?:by\s+)?([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 90
+      },
+      {
+        name: 'Credited by',
+        regex: /credited\s+(?:by\s+)?([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 90
+      },
+      {
+        name: 'Amount/Payment of',
+        regex: /(?:amount|payment)\s*(?:of\s*)?(?:INR|Rs\.?)?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 80
+      },
+      {
+        name: 'Rs.',
+        regex: /Rs\.?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 50
+      },
+      {
+        name: 'INR',
+        regex: /INR\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 50
+      },
+      {
+        name: 'Rupee Symbol',
+        regex: /₹\s*([\d,]+(?:\.\d{1,2})?)/g,
+        priority: 50
+      },
+      {
+        name: 'Rupees',
+        regex: /Rupees?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        priority: 50
+      }
     ];
 
-    for (const pattern of patterns) {
-      const match = message.match(pattern);
-      if (match) {
-        const amountStr = match[1].replace(/,/g, '');
-        const amount = parseFloat(amountStr);
-        if (!isNaN(amount) && amount > 0) {
-          return amount;
+    interface AmountCandidate {
+      amount: number;
+      position: number;
+      pattern: string;
+      matched: string;
+      score: number;
+    }
+
+    const candidates: AmountCandidate[] = [];
+
+    // STEP 1: Extract ALL potential amounts
+    for (const { name, regex, priority } of patterns) {
+      const matches = [...message.matchAll(regex)];
+
+      for (const match of matches) {
+        try {
+          const amountStr = match[1].replace(/,/g, '');
+          const amount = parseFloat(amountStr);
+
+          // STEP 2: Validate amount is reasonable
+          if (isNaN(amount) || amount <= 0) {
+            console.log('[SmsParser] Invalid amount skipped:', match[0]);
+            continue;
+          }
+
+          // Reject amounts > 1 million (likely balance or limit)
+          if (amount > 1000000) {
+            console.log('[SmsParser] Amount too large, skipped:', match[0], `(${amount})`);
+            continue;
+          }
+
+          candidates.push({
+            amount,
+            position: match.index || 0,
+            pattern: name,
+            matched: match[0],
+            score: priority  // Start with pattern priority
+          });
+
+        } catch (error) {
+          console.error('[SmsParser] Error parsing amount:', match[0], error);
         }
       }
     }
 
-    return null;
+    console.log('[SmsParser] Found', candidates.length, 'valid amount candidates:',
+      candidates.map(c => ({ matched: c.matched, amount: c.amount })));
+
+    if (candidates.length === 0) {
+      console.log('[SmsParser] No valid amounts found');
+      return null;
+    }
+
+    // STEP 3: Score each candidate based on context
+    for (const candidate of candidates) {
+      // Get context around the amount
+      const contextStart = Math.max(0, candidate.position - 30);
+      const contextEnd = Math.min(message.length, candidate.position + candidate.matched.length + 30);
+      const context = message.substring(contextStart, contextEnd).toLowerCase();
+
+      // BOOST score for transaction keywords
+      if (context.includes('spent')) candidate.score += 50;
+      if (context.includes('debited') || context.includes('charged')) candidate.score += 45;
+      if (context.includes('credited')) candidate.score += 45;
+      if (context.includes('payment') || context.includes('transaction')) candidate.score += 40;
+
+      // REDUCE score for balance/limit keywords
+      if (context.includes('balance') || context.includes('bal.')) candidate.score -= 100;
+      if (context.includes('limit') || context.includes('lim')) candidate.score -= 100;
+      if (context.includes('available') || context.includes('avl')) candidate.score -= 100;
+      if (context.includes('total') && !context.includes('debited') && !context.includes('spent')) candidate.score -= 50;
+
+      // Prefer amounts earlier in message (transaction amount usually comes first)
+      if (candidate.position < 50) candidate.score += 20;
+      else if (candidate.position < 100) candidate.score += 10;
+
+      // Prefer smaller amounts (transaction more likely than limit)
+      if (candidate.amount < 10000) candidate.score += 10;
+      else if (candidate.amount > 100000) candidate.score -= 20;
+    }
+
+    // STEP 4: Sort by score and return highest
+    candidates.sort((a, b) => b.score - a.score);
+
+    console.log('[SmsParser] Amount candidates with scores:',
+      candidates.map(c => ({
+        matched: c.matched,
+        amount: c.amount,
+        score: c.score
+      })));
+
+    const selected = candidates[0];
+    console.log('[SmsParser] Selected amount:', {
+      matched: selected.matched,
+      amount: selected.amount,
+      score: selected.score,
+      pattern: selected.pattern
+    });
+
+    return selected.amount;
   }
 
   /**
-   * Extract date from SMS
+   * Extract date from SMS with multi-pass extraction and scoring
    */
   private extractDate(message: string): Date {
-    // Common date patterns:
-    // 16Dec24, 16-12-24, 16-12-2024, 16/12/24, 16 Dec 2024, 16-Dec-24
+    console.log('[SmsParser] extractDate called with message:', message.substring(0, 100));
+
+    // Common date patterns with word boundaries to avoid matching timestamps
     const patterns = [
-      // 16Dec24 or 16Dec2024
-      /(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*(\d{2,4})/i,
-      // 16-12-24 or 16-12-2024 or 16/12/24
-      /(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/,
-      // 2024-12-16
-      /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/,
+      {
+        name: 'MonthName',
+        regex: /\b(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*(\d{2,4})\b/gi,
+        type: 0
+      },
+      {
+        name: 'DD-MM-YY',
+        regex: /\b(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})\b/g,
+        type: 1
+      },
+      {
+        name: 'YYYY-MM-DD',
+        regex: /\b(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\b/g,
+        type: 2
+      }
     ];
 
     const monthMap: Record<string, number> = {
@@ -162,39 +288,142 @@ export class SmsParserService {
       jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
     };
 
-    for (const pattern of patterns) {
-      const match = message.match(pattern);
-      if (match) {
+    interface DateCandidate {
+      date: Date;
+      position: number;
+      pattern: string;
+      matched: string;
+      score: number;
+    }
+
+    const candidates: DateCandidate[] = [];
+    const currentYear = new Date().getFullYear();
+    const currentDate = new Date();
+
+    // STEP 1: Extract ALL potential dates
+    for (const { name, regex, type } of patterns) {
+      const matches = [...message.matchAll(regex)];
+
+      for (const match of matches) {
         let day: number, month: number, year: number;
 
-        if (pattern === patterns[0]) {
-          // Month name pattern
-          day = parseInt(match[1]);
-          month = monthMap[match[2].toLowerCase()];
-          year = parseInt(match[3]);
-          if (year < 100) year += 2000;
-        } else if (pattern === patterns[2]) {
-          // YYYY-MM-DD pattern
-          year = parseInt(match[1]);
-          month = parseInt(match[2]) - 1;
-          day = parseInt(match[3]);
-        } else {
-          // DD-MM-YY pattern
-          day = parseInt(match[1]);
-          month = parseInt(match[2]) - 1;
-          year = parseInt(match[3]);
-          if (year < 100) year += 2000;
-        }
+        try {
+          if (type === 0) {
+            // Month name pattern
+            day = parseInt(match[1]);
+            month = monthMap[match[2].toLowerCase()];
+            year = parseInt(match[3]);
+            if (year < 100) year += 2000;
+          } else if (type === 2) {
+            // YYYY-MM-DD pattern
+            year = parseInt(match[1]);
+            month = parseInt(match[2]) - 1;
+            day = parseInt(match[3]);
+          } else {
+            // DD-MM-YY pattern
+            day = parseInt(match[1]);
+            month = parseInt(match[2]) - 1;
+            year = parseInt(match[3]);
+            if (year < 100) year += 2000;
+          }
 
-        const date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) {
-          return date;
+          const date = new Date(year, month, day);
+
+          // STEP 2: Validate date is reasonable
+          if (isNaN(date.getTime())) {
+            console.log('[SmsParser] Invalid date skipped:', match[0]);
+            continue;
+          }
+
+          // Reject dates older than 2015 (likely errors or card issue dates)
+          if (year < 2015) {
+            console.log('[SmsParser] Date too old, skipped:', match[0], `(${year})`);
+            continue;
+          }
+
+          // Reject dates more than 1 year in future
+          if (year > currentYear + 1) {
+            console.log('[SmsParser] Date too far in future, skipped:', match[0], `(${year})`);
+            continue;
+          }
+
+          // Reject dates more than 1 month in future (transaction dates shouldn't be in future)
+          const daysDiff = (date.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysDiff > 31) {
+            console.log('[SmsParser] Date in future, skipped:', match[0], `(${daysDiff} days ahead)`);
+            continue;
+          }
+
+          candidates.push({
+            date,
+            position: match.index || 0,
+            pattern: name,
+            matched: match[0],
+            score: 0
+          });
+
+        } catch (error) {
+          console.error('[SmsParser] Error parsing date:', match[0], error);
         }
       }
     }
 
-    // Default to today if no date found
-    return new Date();
+    console.log('[SmsParser] Found', candidates.length, 'valid date candidates:',
+      candidates.map(c => ({ matched: c.matched, date: c.date.toISOString().split('T')[0] })));
+
+    if (candidates.length === 0) {
+      console.log('[SmsParser] No valid dates found, using today');
+      return new Date();
+    }
+
+    // STEP 3: Score each candidate
+    for (const candidate of candidates) {
+      let score = 0;
+
+      // Score based on proximity to current date (prefer recent dates)
+      const daysDiff = Math.abs((currentDate.getTime() - candidate.date.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff <= 7) score += 50;  // Within last week
+      else if (daysDiff <= 30) score += 30;  // Within last month
+      else if (daysDiff <= 90) score += 10;  // Within last 3 months
+
+      // Score based on context keywords nearby
+      const contextStart = Math.max(0, candidate.position - 30);
+      const contextEnd = Math.min(message.length, candidate.position + candidate.matched.length + 30);
+      const context = message.substring(contextStart, contextEnd).toLowerCase();
+
+      if (context.includes('on ') || context.includes('dated') || context.includes('at ')) score += 20;
+      if (context.includes('spent') || context.includes('debited') || context.includes('credited')) score += 15;
+      if (context.includes('transaction') || context.includes('payment')) score += 15;
+
+      // Prefer dates earlier in message (transaction date usually comes first)
+      if (candidate.position < 50) score += 10;
+      else if (candidate.position < 100) score += 5;
+
+      // Prefer month name format (more explicit)
+      if (candidate.pattern === 'MonthName') score += 10;
+
+      candidate.score = score;
+    }
+
+    // STEP 4: Sort by score and return highest
+    candidates.sort((a, b) => b.score - a.score);
+
+    console.log('[SmsParser] Date candidates with scores:',
+      candidates.map(c => ({
+        matched: c.matched,
+        date: c.date.toISOString().split('T')[0],
+        score: c.score
+      })));
+
+    const selected = candidates[0];
+    console.log('[SmsParser] Selected date:', {
+      matched: selected.matched,
+      date: selected.date.toISOString(),
+      score: selected.score,
+      pattern: selected.pattern
+    });
+
+    return selected.date;
   }
 
   /**

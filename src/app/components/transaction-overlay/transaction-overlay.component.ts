@@ -10,8 +10,11 @@ import {
   IonIcon,
   IonChip,
   IonSearchbar,
+  IonDatetime,
+  IonPopover,
   ModalController,
-  AlertController
+  AlertController,
+  ToastController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline, timeOutline, walletOutline, calendarOutline, storefrontOutline, cardOutline, searchOutline } from 'ionicons/icons';
@@ -34,7 +37,9 @@ import { SyncService } from '../../services/sync.service';
     IonButton,
     IonIcon,
     IonChip,
-    IonSearchbar
+    IonSearchbar,
+    IonDatetime,
+    IonPopover
   ],
   template: `
     <div class="sheet-handle"></div>
@@ -62,12 +67,23 @@ import { SyncService } from '../../services/sync.service';
         ></ion-input>
       </div>
 
-      <!-- Date (Read-only) & Source (Editable) -->
+      <!-- Date (Editable) & Source (Editable) -->
       <div class="date-source-row">
-        <div class="date-display">
+        <button class="date-button" (click)="openDatePicker($event)" id="date-trigger">
           <ion-icon name="calendar-outline"></ion-icon>
-          <span>{{ formatDate(transaction.date) }}</span>
-        </div>
+          <span>{{ formatDate(selectedDate) }}</span>
+        </button>
+        <ion-popover trigger="date-trigger" [dismissOnSelect]="true">
+          <ng-template>
+            <ion-datetime
+              [(ngModel)]="dateIsoString"
+              presentation="date"
+              [min]="minDate"
+              [max]="maxDate"
+              (ionChange)="onDateChange($event)"
+            ></ion-datetime>
+          </ng-template>
+        </ion-popover>
         <div class="source-input-wrapper">
           <ion-icon name="card-outline"></ion-icon>
           <input
@@ -216,12 +232,26 @@ import { SyncService } from '../../services/sync.service';
       padding: 8px 0 16px;
     }
 
-    .date-display {
+    .date-button {
       display: flex;
       align-items: center;
       gap: 6px;
       color: var(--ion-color-medium);
       font-size: 14px;
+      background: var(--ion-color-light);
+      border: 1px solid var(--ion-color-light-shade);
+      padding: 6px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: var(--ion-color-light-shade);
+      }
+
+      &:active {
+        transform: scale(0.98);
+      }
 
       ion-icon {
         font-size: 16px;
@@ -329,6 +359,7 @@ export class TransactionOverlayComponent implements OnInit {
 
   private modalCtrl = inject(ModalController);
   private alertCtrl = inject(AlertController);
+  private toastCtrl = inject(ToastController);
   private storage = inject(TransactionStorageService);
   private smsParser = inject(SmsParserService);
   public syncService = inject(SyncService);
@@ -338,6 +369,12 @@ export class TransactionOverlayComponent implements OnInit {
   source = '';
   selectedCategory = '';
   categorySearch = '';
+
+  // Date picker properties
+  selectedDate: Date = new Date();
+  dateIsoString: string = new Date().toISOString();
+  minDate: string = '2015-01-01';
+  maxDate: string = new Date().toISOString();
 
   // Computed categories based on transaction type
   currentCategories = computed(() => {
@@ -383,6 +420,10 @@ export class TransactionOverlayComponent implements OnInit {
     this.description = this.transaction.description || this.transaction.merchant;
     this.source = this.transaction.source || '';
     this.selectedCategory = this.transaction.category || '';
+
+    // Initialize date
+    this.selectedDate = new Date(this.transaction.date);
+    this.dateIsoString = this.selectedDate.toISOString();
 
     // Debug: Log available categories
     const allCategories = this.storage.categories();
@@ -462,6 +503,50 @@ export class TransactionOverlayComponent implements OnInit {
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
+  openDatePicker(_event: Event) {
+    console.log('[TransactionOverlay] Opening date picker');
+    // Popover will open automatically via trigger
+  }
+
+  async onDateChange(event: any) {
+    const newDateString = event.detail.value;
+    console.log('[TransactionOverlay] Date changed to:', newDateString);
+
+    if (!newDateString) return;
+
+    const newDate = new Date(newDateString);
+
+    // Validate date is not in future
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
+    if (newDate > today) {
+      console.error('[TransactionOverlay] Date validation failed: Future date');
+      await this.showToast('Cannot select a future date', 'danger');
+      // Reset to previous date
+      this.dateIsoString = this.selectedDate.toISOString();
+      return;
+    }
+
+    // Validate date is not too old (before 2015)
+    const minDate = new Date('2015-01-01');
+    if (newDate < minDate) {
+      console.error('[TransactionOverlay] Date validation failed: Date too old');
+      await this.showToast('Date must be after January 1, 2015', 'danger');
+      // Reset to previous date
+      this.dateIsoString = this.selectedDate.toISOString();
+      return;
+    }
+
+    // Update selected date
+    this.selectedDate = newDate;
+    this.dateIsoString = newDateString;
+
+    console.log('[TransactionOverlay] Date updated successfully:', {
+      date: this.selectedDate.toISOString().split('T')[0],
+      affectsSpreadsheet: true
+    });
+  }
+
   formatDate(date: Date): string {
     const d = new Date(date);
     return d.toLocaleDateString('en-IN', {
@@ -471,17 +556,32 @@ export class TransactionOverlayComponent implements OnInit {
     });
   }
 
+  private async showToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 3000,
+      color,
+      position: 'bottom'
+    });
+    await toast.present();
+  }
+
   async dismiss() {
     await this.modalCtrl.dismiss(null, 'cancel');
   }
 
   async saveLater() {
+    console.log('[TransactionOverlay] Saving without category (later)');
+
     // Save without category - stays as pending
     await this.storage.updateTransaction(this.transaction.id, {
       amount: this.amount,
       description: this.description || this.transaction.merchant,
-      source: this.source
+      source: this.source,
+      date: this.selectedDate  // Include edited date
     });
+
+    console.log('[TransactionOverlay] Transaction updated with date:', this.selectedDate.toISOString().split('T')[0]);
 
     await this.modalCtrl.dismiss({ saved: true, synced: false }, 'later');
   }
@@ -489,10 +589,13 @@ export class TransactionOverlayComponent implements OnInit {
   async saveAndSync() {
     if (!this.selectedCategory || this.amount <= 0) return;
 
-    // Update amount and source first
+    console.log('[TransactionOverlay] Saving and syncing with date:', this.selectedDate.toISOString().split('T')[0]);
+
+    // Update amount, source, and date first
     await this.storage.updateTransaction(this.transaction.id, {
       amount: this.amount,
-      source: this.source
+      source: this.source,
+      date: this.selectedDate  // Include edited date
     });
 
     // Mark as ready

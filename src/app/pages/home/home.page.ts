@@ -381,22 +381,82 @@ export class HomePage implements OnInit {
   }
 
   async showTransactionOverlay(transaction: Transaction, isEditing: boolean) {
-    const modal = await this.modalCtrl.create({
-      component: TransactionOverlayComponent,
-      componentProps: { transaction, isEditing },
-      cssClass: 'transaction-overlay',
-      initialBreakpoint: 0.6,
-      breakpoints: [0, 0.6, 0.85],
-      handleBehavior: 'cycle'
+    console.log('[HomePage] showTransactionOverlay called:', {
+      transactionId: transaction.id,
+      isEditing
     });
 
-    await modal.present();
+    // STEP 1: Validate transaction data
+    console.log('[HomePage] Transaction data:', {
+      id: transaction.id,
+      amount: transaction.amount,
+      type: transaction.type,
+      status: transaction.status,
+      category: transaction.category,
+      description: transaction.description
+    });
 
-    const { data, role } = await modal.onDidDismiss();
+    if (!transaction.amount || transaction.amount <= 0) {
+      console.error('[HomePage] Invalid transaction amount:', transaction.amount);
+      await this.showToast('Invalid transaction data', 'danger');
+      return;
+    }
 
-    if (data?.saved) {
-      const message = data.synced ? 'Transaction saved and synced!' : 'Transaction saved.';
-      await this.showToast(message, 'success');
+    // STEP 2: Create modal with error handling
+    let modal: HTMLIonModalElement;
+    try {
+      console.log('[HomePage] Creating modal for transaction:', transaction.id);
+      modal = await this.modalCtrl.create({
+        component: TransactionOverlayComponent,
+        componentProps: { transaction, isEditing },
+        cssClass: 'transaction-overlay',
+        initialBreakpoint: 0.6,
+        breakpoints: [0, 0.6, 0.85],
+        handleBehavior: 'cycle'
+      });
+      console.log('[HomePage] Modal created successfully');
+    } catch (error) {
+      console.error('[HomePage] Modal creation failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId: transaction.id
+      });
+      await this.showToast('Failed to open transaction overlay. Please try again.', 'danger');
+      return;
+    }
+
+    // STEP 3: Present modal with error handling
+    try {
+      console.log('[HomePage] Presenting modal for transaction:', transaction.id);
+      await modal.present();
+      console.log('[HomePage] Modal presented successfully');
+    } catch (error) {
+      console.error('[HomePage] Modal presentation failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId: transaction.id
+      });
+      await this.showToast('Failed to display transaction overlay. Please try again.', 'danger');
+      return;
+    }
+
+    // STEP 4: Wait for dismissal with error handling
+    try {
+      console.log('[HomePage] Waiting for modal dismissal...');
+      const { data, role } = await modal.onDidDismiss();
+      console.log('[HomePage] Modal dismissed with data:', data, 'role:', role);
+
+      if (data?.saved) {
+        const message = data.synced ? 'Transaction saved and synced!' : 'Transaction saved.';
+        await this.showToast(message, 'success');
+      }
+    } catch (error) {
+      console.error('[HomePage] Modal dismissal error:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        transactionId: transaction.id
+      });
+      // Don't show toast here - modal might have been dismissed successfully but onDidDismiss threw
     }
   }
 
