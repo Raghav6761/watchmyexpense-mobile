@@ -17,6 +17,7 @@ jobs:
           username: root
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
+            set -e
             cd /var/www/watchmyexpense-mobile
 
             # Pull latest code (or clone if first time)
@@ -27,7 +28,7 @@ jobs:
             fi
 
             # Install dependencies
-            npm install
+            npm ci
 
             # Build the app (with memory limit to avoid crashes)
             NODE_OPTIONS="--max_old_space_size=768" npm run build
