@@ -33,34 +33,48 @@ export interface Categories {
 
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Food',
-  'Transport',
-  'Shopping',
-  'Bills & Utilities',
-  'Entertainment',
-  'Health',
-  'Education',
-  'Monthly Subs',
-  'Credit Card Payment',
-  'Other'
+  'Gifts',
+  'Health/medical',
+  'Home/Rent',
+  'Transportation',
+  'Personal',
+  'Bike Pay',
+  'Utilities',
+  'Travel',
+  'Debt',
+  'Other',
+  'Loan To',
+  'Mutual Funds',
+  'Unexpected Expense',
+  'Hosting and server',
+  'EMI',
+  'Monthly Subscription',
+  'Company Compliances',
+  'Investment',
+  'Liability'
 ];
 
 export const DEFAULT_INCOME_CATEGORIES = [
-  'Paycheck',
-  'Freelance',
   'Second source(s)',
-  'Credit Card',
+  'Paycheck',
+  'Bonus',
+  'Interest',
+  'Other',
   'Loan Return',
-  'Refund',
-  'Other'
+  'Mutual Funds Interest',
+  'Loan Taken',
+  'Credit Card'
 ];
 
 export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Food': ['swiggy', 'zomato', 'restaurant', 'cafe', 'food', 'pizza', 'burger', 'dominos', 'mcd', 'kfc'],
-  'Transport': ['uber', 'ola', 'rapido', 'petrol', 'diesel', 'fuel', 'metro', 'irctc', 'redbus'],
-  'Shopping': ['amazon', 'flipkart', 'myntra', 'ajio', 'mall', 'store', 'mart', 'reliance', 'dmart'],
-  'Bills & Utilities': ['electricity', 'water', 'gas', 'broadband', 'jio', 'airtel', 'vi', 'bsnl', 'tata'],
-  'Entertainment': ['netflix', 'prime', 'hotstar', 'spotify', 'movie', 'pvr', 'inox', 'bookmyshow'],
-  'Health': ['pharmacy', 'medical', 'hospital', 'doctor', 'apollo', 'medplus', '1mg', 'pharmeasy'],
-  'Monthly Subs': ['linkedin', 'digital ocean', 'subscription', 'premium', 'adobe', 'github'],
-  'Credit Card Payment': ['credit card', 'card payment', 'hdfc card', 'axis card', 'sbi card', 'cred']
+  'Transportation': ['uber', 'ola', 'rapido', 'petrol', 'diesel', 'fuel', 'metro', 'irctc', 'redbus'],
+  'Personal': ['amazon', 'flipkart', 'myntra', 'ajio', 'mall', 'store', 'mart', 'reliance', 'dmart'],
+  'Utilities': ['electricity', 'water', 'gas', 'broadband', 'jio', 'airtel', 'vi', 'bsnl', 'tata'],
+  'Monthly Subscription': ['netflix', 'prime', 'hotstar', 'spotify', 'linkedin', 'adobe', 'github', 'subscription', 'premium'],
+  'Health/medical': ['pharmacy', 'medical', 'hospital', 'doctor', 'apollo', 'medplus', '1mg', 'pharmeasy'],
+  'Bike Pay': ['petrol', 'bike', 'helmet', 'servicing'],
+  'Home/Rent': ['rent', 'maintenance', 'society', 'housing'],
+  'EMI': ['emi', 'instalment', 'installment'],
+  'Hosting and server': ['digital ocean', 'aws', 'heroku', 'vercel', 'netlify', 'cloudflare']
 };

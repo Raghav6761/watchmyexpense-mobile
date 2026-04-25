@@ -183,33 +183,43 @@ export class SyncService {
   }
 
   /**
+   * Update fiscal year start month on backend
+   */
+  async updateYearStartMonth(month: number): Promise<{ success: boolean; example?: string; error?: string }> {
+    try {
+      const response = await firstValueFrom(
+        this.http.post<{ success: boolean; yearStartMonth: number; spreadsheetNameExample: string }>(
+          `${this.baseUrl}/api/config/year-start`,
+          { month }
+        )
+      );
+      await this.storage.setYearStartMonth(month);
+      return { success: true, example: response.spreadsheetNameExample };
+    } catch (error: unknown) {
+      console.error('Error updating year start month:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update';
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
    * Get current backend configuration
    */
   async getBackendConfig(): Promise<{
-    sheetNamePattern: string;
+    yearStartMonth: number;
     example: string;
   } | null> {
     try {
       const response = await firstValueFrom(
         this.http.get<{
-          sheetId: string;
-          sheetNamePattern: string;
-          expensesStartRow: number;
-          incomeStartRow: number;
+          yearStartMonth: number;
+          spreadsheetNameExample: string;
         }>(`${this.baseUrl}/api/config`)
       );
 
-      // Generate example from pattern
-      const now = new Date();
-      const months = ['January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'];
-      const example = response.sheetNamePattern
-        .replace('{month}', months[now.getMonth()])
-        .replace('{year}', now.getFullYear().toString());
-
       return {
-        sheetNamePattern: response.sheetNamePattern,
-        example
+        yearStartMonth: response.yearStartMonth,
+        example: response.spreadsheetNameExample
       };
     } catch (error) {
       console.error('Error fetching backend config:', error);
@@ -343,6 +353,54 @@ export class SyncService {
   async autoSync(): Promise<void> {
     if (this.canSync()) {
       await this.syncAll();
+    }
+  }
+
+  /**
+   * Add a new category
+   */
+  async addCategory(type: 'expense' | 'income', name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/api/categories/add`, { type, name })
+      );
+      await this.fetchCategories();
+      return { success: true };
+    } catch (error: any) {
+      const msg = error?.error?.error || error?.message || 'Failed to add category';
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Rename a category across all sheets
+   */
+  async editCategory(type: 'expense' | 'income', oldName: string, newName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/api/categories/edit`, { type, oldName, newName })
+      );
+      await this.fetchCategories();
+      return { success: true };
+    } catch (error: any) {
+      const msg = error?.error?.error || error?.message || 'Failed to edit category';
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Delete a category from dropdown (existing data preserved)
+   */
+  async deleteCategory(type: 'expense' | 'income', name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/api/categories/delete`, { type, name })
+      );
+      await this.fetchCategories();
+      return { success: true };
+    } catch (error: any) {
+      const msg = error?.error?.error || error?.message || 'Failed to delete category';
+      return { success: false, error: msg };
     }
   }
 }

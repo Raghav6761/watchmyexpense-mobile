@@ -32,6 +32,11 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "/assets"
+              },
+              {
+                "glob": "privacy.html",
+                "input": "src",
+                "output": "/"
               }
             ],
             "styles": [
@@ -82,6 +87,11 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "/assets"
+              },
+              {
+                "glob": "privacy.html",
+                "input": "src",
+                "output": "/"
               }
             ],
             "styles": ["src/global.scss"],

@@ -18,6 +18,8 @@ import {
   IonNote,
   IonToggle,
   IonListHeader,
+  IonSelect,
+  IonSelectOption,
   ToastController,
   AlertController
 } from '@ionic/angular/standalone';
@@ -34,7 +36,8 @@ import {
   checkmarkCircleOutline,
   alertCircleOutline,
   documentTextOutline,
-  saveOutline
+  saveOutline,
+  cardOutline
 } from 'ionicons/icons';
 
 import { TransactionStorageService } from '../../services/transaction-storage.service';
@@ -63,7 +66,9 @@ import { Capacitor } from '@capacitor/core';
     IonIcon,
     IonNote,
     IonToggle,
-    IonListHeader
+    IonListHeader,
+    IonSelect,
+    IonSelectOption
   ],
   template: `
     <ion-header>
@@ -134,6 +139,14 @@ import { Capacitor } from '@capacitor/core';
             <p>See all expense and income categories</p>
           </ion-label>
         </ion-item>
+
+        <ion-item button routerLink="/liabilities">
+          <ion-icon name="card-outline" slot="start" color="warning"></ion-icon>
+          <ion-label>
+            <h2>Manage Liabilities</h2>
+            <p>Credit cards, loans & monthly payments</p>
+          </ion-label>
+        </ion-item>
       </ion-list>
 
       <!-- Authentication -->
@@ -165,34 +178,30 @@ import { Capacitor } from '@capacitor/core';
         }
       </ion-list>
 
-      <!-- Sheet Configuration -->
+      <!-- Fiscal Year Configuration -->
       <ion-list>
         <ion-list-header>
-          <ion-label>Sheet Configuration</ion-label>
+          <ion-label>Fiscal Year</ion-label>
         </ion-list-header>
 
         <ion-item>
           <ion-icon name="document-text-outline" slot="start"></ion-icon>
-          <ion-input
-            label="Sheet Name Pattern"
+          <ion-select
+            label="Year starts in"
             labelPlacement="stacked"
-            [(ngModel)]="sheetPattern"
-            placeholder="Monthly budget {month} {year}"
-            helperText="Use {month} and {year} as placeholders"
-          ></ion-input>
+            [(ngModel)]="yearStartMonth"
+            (ionChange)="saveYearStartMonth()"
+          >
+            @for (m of MONTHS; track m.value) {
+              <ion-select-option [value]="m.value">{{ m.label }}</ion-select-option>
+            }
+          </ion-select>
         </ion-item>
 
         <ion-item>
           <ion-label>
-            <p class="pattern-preview">Preview: <strong>{{ sheetPatternPreview }}</strong></p>
+            <p class="pattern-preview">Sheet name: <strong>{{ sheetNamePreview }}</strong></p>
           </ion-label>
-        </ion-item>
-
-        <ion-item>
-          <ion-button fill="outline" (click)="saveSheetPattern()" [disabled]="!isPatternValid">
-            <ion-icon name="save-outline" slot="start"></ion-icon>
-            Save Pattern
-          </ion-button>
         </ion-item>
       </ion-list>
 
@@ -304,14 +313,18 @@ export class SettingsPage {
   public syncService = inject(SyncService);
   private smsListener = inject(SmsListenerService);
 
-  sheetPattern = '';
+  yearStartMonth = 1;
   isAndroid = false;
   hasOverlayPermission = false;
 
-  // Month names for preview
-  private readonly MONTHS = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+  // Month options for fiscal year dropdown
+  readonly MONTHS = [
+    { value: 1, label: 'January' }, { value: 2, label: 'February' },
+    { value: 3, label: 'March' }, { value: 4, label: 'April' },
+    { value: 5, label: 'May' }, { value: 6, label: 'June' },
+    { value: 7, label: 'July' }, { value: 8, label: 'August' },
+    { value: 9, label: 'September' }, { value: 10, label: 'October' },
+    { value: 11, label: 'November' }, { value: 12, label: 'December' }
   ];
 
   constructor() {
@@ -327,31 +340,35 @@ export class SettingsPage {
       checkmarkCircleOutline,
       alertCircleOutline,
       documentTextOutline,
-      saveOutline
+      saveOutline,
+      cardOutline
     });
 
-    this.sheetPattern = this.storage.sheetNamePattern();
+    this.yearStartMonth = this.storage.yearStartMonth();
   }
 
-  get sheetPatternPreview(): string {
+  get sheetNamePreview(): string {
     const now = new Date();
-    return this.sheetPattern
-      .replace('{month}', this.MONTHS[now.getMonth()])
-      .replace('{year}', now.getFullYear().toString());
-  }
-
-  get isPatternValid(): boolean {
-    return this.sheetPattern.includes('{month}') && this.sheetPattern.includes('{year}');
+    const year = now.getFullYear();
+    if (this.yearStartMonth === 1) {
+      return `Budget ${year}`;
+    }
+    const month = now.getMonth(); // 0-based
+    const startIndex = this.yearStartMonth - 1;
+    const startYear = month >= startIndex ? year : year - 1;
+    const endYearShort = String(startYear + 1).slice(-2);
+    return `Budget FY ${startYear}-${endYearShort}`;
   }
 
   ionViewWillEnter() {
-    // Check platform when view is about to enter
     this.isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-    console.log('Settings: isAndroid =', this.isAndroid, 'platform =', Capacitor.getPlatform());
 
     if (this.isAndroid) {
       this.checkOverlayPermission();
     }
+
+    // Refresh year start month from storage
+    this.yearStartMonth = this.storage.yearStartMonth();
   }
 
   async checkOverlayPermission() {
@@ -369,20 +386,15 @@ export class SettingsPage {
     setTimeout(() => this.checkOverlayPermission(), 2000);
   }
 
-  async saveSheetPattern() {
-    if (!this.isPatternValid) {
-      await this.showToast('Pattern must include {month} and {year}', 'warning');
-      return;
-    }
-
-    const result = await this.syncService.updateSheetPattern(this.sheetPattern);
+  async saveYearStartMonth() {
+    const result = await this.syncService.updateYearStartMonth(this.yearStartMonth);
 
     if (result.success) {
-      await this.showToast(`Pattern saved! Example: ${result.example}`, 'success');
+      await this.showToast(`Year starts in ${this.MONTHS[this.yearStartMonth - 1].label}. Sheet: ${result.example}`, 'success');
     } else {
       // Save locally even if backend fails
-      await this.storage.setSheetNamePattern(this.sheetPattern);
-      await this.showToast('Pattern saved locally (backend unreachable)', 'warning');
+      await this.storage.setYearStartMonth(this.yearStartMonth);
+      await this.showToast('Saved locally (backend unreachable)', 'warning');
     }
   }
 
@@ -452,7 +464,7 @@ export class SettingsPage {
 
     const alert = await this.alertCtrl.create({
       header: 'Clear Synced',
-      message: `Remove ${count} synced transaction(s)?`,
+      message: `Remove ${count} synced transaction(s)? This will also remove analytics history for these transactions.`,
       buttons: [
         { text: 'Cancel', role: 'cancel' },
         {

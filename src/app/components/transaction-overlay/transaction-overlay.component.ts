@@ -13,8 +13,7 @@ import {
   IonDatetime,
   IonPopover,
   ModalController,
-  AlertController,
-  ToastController
+  AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { closeOutline, checkmarkOutline, timeOutline, walletOutline, calendarOutline, storefrontOutline, cardOutline, searchOutline } from 'ionicons/icons';
@@ -78,8 +77,6 @@ import { SyncService } from '../../services/sync.service';
             <ion-datetime
               [(ngModel)]="dateIsoString"
               presentation="date"
-              [min]="minDate"
-              [max]="maxDate"
               (ionChange)="onDateChange($event)"
             ></ion-datetime>
           </ng-template>
@@ -359,7 +356,6 @@ export class TransactionOverlayComponent implements OnInit {
 
   private modalCtrl = inject(ModalController);
   private alertCtrl = inject(AlertController);
-  private toastCtrl = inject(ToastController);
   private storage = inject(TransactionStorageService);
   private smsParser = inject(SmsParserService);
   public syncService = inject(SyncService);
@@ -373,8 +369,6 @@ export class TransactionOverlayComponent implements OnInit {
   // Date picker properties
   selectedDate: Date = new Date();
   dateIsoString: string = new Date().toISOString();
-  minDate: string = '2015-01-01';
-  maxDate: string = new Date().toISOString();
 
   // Computed categories based on transaction type
   currentCategories = computed(() => {
@@ -516,27 +510,6 @@ export class TransactionOverlayComponent implements OnInit {
 
     const newDate = new Date(newDateString);
 
-    // Validate date is not in future
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    if (newDate > today) {
-      console.error('[TransactionOverlay] Date validation failed: Future date');
-      await this.showToast('Cannot select a future date', 'danger');
-      // Reset to previous date
-      this.dateIsoString = this.selectedDate.toISOString();
-      return;
-    }
-
-    // Validate date is not too old (before 2015)
-    const minDate = new Date('2015-01-01');
-    if (newDate < minDate) {
-      console.error('[TransactionOverlay] Date validation failed: Date too old');
-      await this.showToast('Date must be after January 1, 2015', 'danger');
-      // Reset to previous date
-      this.dateIsoString = this.selectedDate.toISOString();
-      return;
-    }
-
     // Update selected date
     this.selectedDate = newDate;
     this.dateIsoString = newDateString;
@@ -554,16 +527,6 @@ export class TransactionOverlayComponent implements OnInit {
       month: 'short',
       year: 'numeric'
     });
-  }
-
-  private async showToast(message: string, color: string) {
-    const toast = await this.toastCtrl.create({
-      message,
-      duration: 3000,
-      color,
-      position: 'bottom'
-    });
-    await toast.present();
   }
 
   async dismiss() {

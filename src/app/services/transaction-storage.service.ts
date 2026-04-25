@@ -13,7 +13,8 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'payment_tracker_transactions',
   CATEGORIES: 'payment_tracker_categories',
   BACKEND_URL: 'payment_tracker_backend_url',
-  SHEET_NAME_PATTERN: 'payment_tracker_sheet_pattern'
+  SHEET_NAME_PATTERN: 'payment_tracker_sheet_pattern',
+  YEAR_START_MONTH: 'payment_tracker_year_start_month'
 };
 
 @Injectable({
@@ -28,12 +29,14 @@ export class TransactionStorageService {
   });
   private _backendUrl = signal<string>('https://api.watchmyexpense.com');
   private _sheetNamePattern = signal<string>('Monthly budget {month} {year}');
+  private _yearStartMonth = signal<number>(1); // 1=January, 4=April, etc.
 
   // Public readonly signals
   public transactions = this._transactions.asReadonly();
   public categories = this._categories.asReadonly();
   public backendUrl = this._backendUrl.asReadonly();
   public sheetNamePattern = this._sheetNamePattern.asReadonly();
+  public yearStartMonth = this._yearStartMonth.asReadonly();
 
   // Computed values
   public pendingCount = computed(() =>
@@ -115,6 +118,14 @@ export class TransactionStorageService {
       });
       if (sheetPattern) {
         this._sheetNamePattern.set(sheetPattern);
+      }
+
+      // Load year start month
+      const { value: yearStartMonth } = await Preferences.get({
+        key: STORAGE_KEYS.YEAR_START_MONTH
+      });
+      if (yearStartMonth) {
+        this._yearStartMonth.set(parseInt(yearStartMonth, 10));
       }
     } catch (error) {
       console.error('Error loading from storage:', error);
@@ -301,6 +312,17 @@ export class TransactionStorageService {
     await Preferences.set({
       key: STORAGE_KEYS.SHEET_NAME_PATTERN,
       value: pattern
+    });
+  }
+
+  /**
+   * Update fiscal year start month
+   */
+  async setYearStartMonth(month: number): Promise<void> {
+    this._yearStartMonth.set(month);
+    await Preferences.set({
+      key: STORAGE_KEYS.YEAR_START_MONTH,
+      value: month.toString()
     });
   }
 

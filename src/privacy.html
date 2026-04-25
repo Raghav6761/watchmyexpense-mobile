@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Watch My Expense</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.6; }
+  h1 { font-size: 1.8em; margin-bottom: 0.2em; }
+  h2 { font-size: 1.2em; margin-top: 1.8em; color: #0b3d91; }
+  .effective { color: #666; font-size: 0.9em; margin-top: 0; }
+  ul { padding-left: 1.4em; }
+  li { margin: 0.3em 0; }
+  code { background: #f4f4f4; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  .callout { background: #fff8e1; border-left: 4px solid #f0a500; padding: 12px 16px; margin: 1em 0; border-radius: 4px; }
+  a { color: #0b3d91; }
+  footer { margin-top: 3em; padding-top: 1.5em; border-top: 1px solid #eee; color: #666; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>Watch My Expense — Privacy Policy</h1>
+<p class="effective">Effective date: April 25, 2026</p>
+
+<p>
+  Watch My Expense ("the app") is a personal finance tool that reads bank/UPI SMS messages on
+  your Android device, helps you categorize transactions, and syncs them to a Google Sheet that
+  belongs to you. This policy explains exactly what data the app handles and why.
+</p>
+
+<h2>What the app accesses</h2>
+<ul>
+  <li><strong>SMS messages</strong> on your device, used solely to detect transaction notifications from banks and UPI services. Parsing happens entirely on your device. SMS content is never transmitted to our backend or to any third party.</li>
+  <li><strong>Your Google account</strong> (email and basic profile), used only to authenticate you with Google so the app can write to your spreadsheet.</li>
+  <li><strong>Google Sheets</strong> scope (<code>https://www.googleapis.com/auth/spreadsheets</code>), used to create and update the personal finance spreadsheet that the app maintains for you.</li>
+  <li><strong>Google Drive read-only</strong> scope (<code>https://www.googleapis.com/auth/drive.readonly</code>), used only to locate or list spreadsheets that this app has previously created for you.</li>
+</ul>
+
+<h2>What the app stores</h2>
+<ul>
+  <li><strong>On your device</strong> (via Capacitor Preferences): your transactions, category choices, and app settings. This data stays on your phone and is not transmitted anywhere except to your own Google Sheet when you sync.</li>
+  <li><strong>On our backend</strong> (a server we operate on DigitalOcean): your Google OAuth tokens, used to keep your sync session active. Tokens are stored in a server-side file and are not shared with anyone. No transaction data is stored on our backend.</li>
+  <li><strong>In your Google Sheet</strong>: your transactions, categories, budgets, and liabilities. This sheet lives in your Google Drive, owned by you, and we have no copy of it.</li>
+</ul>
+
+<h2>How the app uses your data</h2>
+<p>The app uses the data above only to provide the personal finance tracking feature you asked for: detecting transactions, categorizing them, syncing them to your sheet, and showing you analytics. That is the only purpose.</p>
+
+<div class="callout">
+  <strong>Limited Use disclosure (Google API Services User Data Policy).</strong>
+  Watch My Expense's use and transfer of information received from Google APIs adheres to the
+  <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+  including the Limited Use requirements. Specifically:
+  <ul>
+    <li>Google user data is used only to provide and improve user-facing features that are prominent in the app.</li>
+    <li>We do not transfer Google user data to third parties except as necessary to provide or improve user-facing features, and we do not sell it.</li>
+    <li>We do not use Google user data for advertising.</li>
+    <li>No human reads Google user data unless you give explicit consent, the data is needed for security investigations, or to comply with applicable law.</li>
+  </ul>
+</div>
+
+<h2>Sharing</h2>
+<p>We do not sell, rent, or share your data with anyone. The only network traffic the app generates is between your device, our backend (for OAuth and sync coordination), and Google's APIs.</p>
+
+<h2>Third parties</h2>
+<ul>
+  <li><strong>Google</strong> — handles authentication and stores your spreadsheet.</li>
+  <li><strong>DigitalOcean</strong> — hosts our backend server.</li>
+</ul>
+<p>The app does not use analytics SDKs, ad networks, or crash-reporting services.</p>
+
+<h2>Data retention and deletion</h2>
+<ul>
+  <li>You can revoke the app's access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Once revoked, our stored OAuth tokens for your account become unusable.</li>
+  <li>You can clear all on-device data by uninstalling the app or by clearing app storage in Android settings.</li>
+  <li>Your Google Sheet remains in your Drive after you uninstall — you control whether to keep or delete it.</li>
+  <li>To request deletion of any OAuth tokens we hold for you, email us using the contact below.</li>
+</ul>
+
+<h2>Children</h2>
+<p>The app is not intended for users under 13. We do not knowingly collect data from children.</p>
+
+<h2>Changes to this policy</h2>
+<p>If this policy changes, the new version will be posted at this URL and the effective date above will be updated.</p>
+
+<h2>Contact</h2>
+<p>Questions or deletion requests: <a href="mailto:wraghav6761@gmail.com">wraghav6761@gmail.com</a></p>
+
+<footer>Watch My Expense is a personal project. This policy applies to the Android app and the backend service that supports it.</footer>
+
+</body>
+</html>
