@@ -24,6 +24,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link: backend redirects here after OAuth completes,
+                 carrying the JWT in a query param. Android matches the scheme
+                 and resumes/launches the app; AuthService picks up the URL via
+                 the @capacitor/app appUrlOpen listener. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="watchmyexpense" android:host="auth" />
+            </intent-filter>
+
         </activity>
 
         <provider

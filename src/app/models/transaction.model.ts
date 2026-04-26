@@ -31,6 +31,21 @@ export interface Categories {
   income: string[];
 }
 
+/**
+ * One row from the user's Liability master register (Summary tab A41:E60).
+ * Used by the SMS parser to recognize which card/loan an SMS belongs to.
+ *
+ * sourceKeyword is comma-separated AND-tokens: "HDFC, 1525" means an SMS must
+ * contain both "HDFC" and "1525" (case-insensitive substring) to match this card.
+ */
+export interface MasterLiability {
+  name: string;
+  creditLimit: number;
+  interestRate: number;
+  billingCycle: string;
+  sourceKeyword: string;
+}
+
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Food',
   'Gifts',

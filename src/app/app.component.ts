@@ -83,13 +83,15 @@ export class AppComponent implements OnInit, OnDestroy {
       (update) => this.handleOverlayUpdate(update)
     );
 
-    // Check auth status and fetch categories on startup
+    // Check auth status and fetch categories + liabilities on startup
     await this.syncService.checkAuthStatus();
     console.log('[AppInit] Auth status:', this.syncService.isAuthenticated());
     if (this.syncService.isAuthenticated()) {
       console.log('[AppInit] Fetching categories from backend...');
       const categories = await this.syncService.fetchCategories();
       console.log('[AppInit] Categories fetched:', categories ? 'success' : 'failed (using cached/defaults)');
+      // Liability master register feeds the SMS parser's source-detection logic.
+      await this.syncService.fetchLiabilitiesMaster();
     }
 
     // Listen for app resume
@@ -99,9 +101,10 @@ export class AppComponent implements OnInit, OnDestroy {
         // Refresh auth status first (in case token expired or refreshed)
         await this.syncService.checkAuthStatus();
         console.log('[AppState] Auth status refreshed:', this.syncService.isAuthenticated());
-        // Refresh categories from backend (also syncs to native overlay)
+        // Refresh categories + liabilities from backend (categories also sync to native overlay).
         if (this.syncService.isAuthenticated()) {
           await this.syncService.fetchCategories();
+          await this.syncService.fetchLiabilitiesMaster();
         }
         // Process any transactions detected while app was in background
         await this.processPendingTransactions();

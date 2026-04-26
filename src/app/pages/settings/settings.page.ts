@@ -158,7 +158,7 @@ import { Capacitor } from '@capacitor/core';
         @if (syncService.isAuthenticated()) {
           <ion-item>
             <ion-label>
-              <p>You are connected to Google Sheets.</p>
+              <p>Connected as <strong>{{ syncService.currentEmail() || 'your Google account' }}</strong></p>
             </ion-label>
             <ion-button slot="end" fill="outline" color="danger" (click)="logout()">
               <ion-icon name="log-out-outline" slot="start"></ion-icon>

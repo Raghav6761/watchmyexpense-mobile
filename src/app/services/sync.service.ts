@@ -1,14 +1,14 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Browser } from '@capacitor/browser';
 import { TransactionStorageService } from './transaction-storage.service';
 import { SmsListenerService } from './sms-listener.service';
-import { Transaction, Categories } from '../models/transaction.model';
+import { AuthService } from './auth.service';
+import { Transaction, Categories, MasterLiability } from '../models/transaction.model';
 
 export interface AuthStatus {
   authenticated: boolean;
-  hasRefreshToken: boolean;
+  email?: string;
 }
 
 export interface SyncResult {
@@ -33,21 +33,24 @@ export class SyncService {
   private http = inject(HttpClient);
   private storage = inject(TransactionStorageService);
   private smsListener = inject(SmsListenerService);
+  private auth = inject(AuthService);
 
   // Reactive state
-  private _isAuthenticated = signal(false);
   private _isSyncing = signal(false);
   private _isOnline = signal(navigator.onLine);
 
-  // Public signals
-  public isAuthenticated = this._isAuthenticated.asReadonly();
+  // Auth signals are now delegated to AuthService — they reactively follow
+  // whatever AuthService says. Keeps settings.page and existing callers working.
+  public isAuthenticated = this.auth.signedIn;
+  public currentEmail = this.auth.currentEmail;
+
   public isSyncing = this._isSyncing.asReadonly();
   public isOnline = this._isOnline.asReadonly();
 
   // Can sync if online, authenticated, and has ready transactions
   public canSync = computed(() =>
     this._isOnline() &&
-    this._isAuthenticated() &&
+    this.auth.signedIn() &&
     this.storage.readyCount() > 0 &&
     !this._isSyncing()
   );
@@ -56,9 +59,6 @@ export class SyncService {
     // Listen for online/offline events
     window.addEventListener('online', () => this._isOnline.set(true));
     window.addEventListener('offline', () => this._isOnline.set(false));
-
-    // Check auth status on init
-    this.checkAuthStatus();
   }
 
   /**
@@ -83,53 +83,44 @@ export class SyncService {
   }
 
   /**
-   * Check authentication status with backend
+   * Re-verify session with backend. Now delegates to AuthService, which
+   * also reconciles email and clears local JWT if backend has revoked it.
    */
   async checkAuthStatus(): Promise<boolean> {
-    try {
-      const response = await firstValueFrom(
-        this.http.get<AuthStatus>(`${this.baseUrl}/auth/status`)
-      );
-      this._isAuthenticated.set(response.authenticated);
-      return response.authenticated;
-    } catch {
-      this._isAuthenticated.set(false);
-      return false;
-    }
+    return this.auth.refreshStatus();
   }
 
   /**
-   * Start OAuth flow
+   * Start OAuth flow. Returns immediately — completion is async via the
+   * deep-link listener inside AuthService. UI should react to the
+   * `isAuthenticated` signal flipping to true.
    */
   async authenticate(): Promise<void> {
-    try {
-      // Get the OAuth URL from backend
-      const response = await firstValueFrom(
-        this.http.get<{ url: string }>(`${this.baseUrl}/auth/url`)
-      );
+    return this.auth.signIn();
+  }
 
-      // Open the OAuth URL in system browser
-      await Browser.open({ url: response.url });
-
-      // Note: After successful auth, user needs to return to app
-      // and we'll check auth status again
-    } catch (error) {
-      console.error('Authentication error:', error);
-      throw error;
-    }
+  async logout(): Promise<void> {
+    return this.auth.signOut();
   }
 
   /**
-   * Logout
+   * Fetch the user's liability master register from backend and cache it locally.
+   * The SMS parser uses this cache to identify which card a transaction belongs to,
+   * so refreshing it after every add/edit/delete is important.
    */
-  async logout(): Promise<void> {
+  async fetchLiabilitiesMaster(): Promise<MasterLiability[] | null> {
+    if (!this.auth.signedIn()) return null;
     try {
-      await firstValueFrom(
-        this.http.post(`${this.baseUrl}/auth/logout`, {})
+      const res = await firstValueFrom(
+        this.http.get<{ liabilities: MasterLiability[] }>(`${this.baseUrl}/api/liabilities/master`)
       );
-      this._isAuthenticated.set(false);
+      const list = res.liabilities || [];
+      await this.storage.updateLiabilities(list);
+      console.log(`[SyncService] Cached ${list.length} liability cards/loans`);
+      return list;
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[SyncService] Error fetching liabilities master:', error);
+      return null;
     }
   }
 
@@ -239,7 +230,7 @@ export class SyncService {
       description: transaction.description
     });
 
-    if (!this._isAuthenticated()) {
+    if (!this.auth.signedIn()) {
       console.error('[SyncService] Not authenticated - cannot sync');
       return false;
     }
@@ -279,7 +270,7 @@ export class SyncService {
    * Batch sync all ready transactions
    */
   async syncAll(): Promise<{ synced: number; failed: number }> {
-    if (!this._isAuthenticated()) {
+    if (!this.auth.signedIn()) {
       return { synced: 0, failed: 0 };
     }
 

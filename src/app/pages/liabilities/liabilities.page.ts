@@ -255,11 +255,14 @@ export class LiabilitiesPage implements OnInit {
 
   async loadData() {
     try {
-      // Fetch master liabilities
+      // Fetch master liabilities (also pushed into the storage cache so the
+      // SMS parser sees the up-to-date keyword list immediately after edits).
       const masterRes = await firstValueFrom(
         this.http.get<{ liabilities: MasterLiability[] }>(`${this.baseUrl}/api/liabilities/master`)
       );
-      this.masterLiabilities.set(masterRes.liabilities || []);
+      const list = masterRes.liabilities || [];
+      this.masterLiabilities.set(list);
+      await this.storage.updateLiabilities(list);
 
       // Fetch current month's liabilities
       const now = new Date();
@@ -279,7 +282,7 @@ export class LiabilitiesPage implements OnInit {
       header: 'Add Card / Loan',
       inputs: [
         { name: 'name', type: 'text', placeholder: 'Name (e.g. HDFC Credit Card)' },
-        { name: 'sourceKeyword', type: 'text', placeholder: 'Source keyword (e.g. HDFC) — auto-tracks spending' },
+        { name: 'sourceKeyword', type: 'text', placeholder: 'Match keywords (e.g. "HDFC, 1525") — comma-separated, all must match' },
         { name: 'creditLimit', type: 'number', placeholder: 'Credit Limit / Principal' },
         { name: 'interestRate', type: 'number', placeholder: 'Interest Rate %' },
         { name: 'billingCycle', type: 'text', placeholder: 'Billing Cycle (e.g. 1st-30th)' }

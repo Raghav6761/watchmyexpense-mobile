@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ParsedSms, TransactionType, CATEGORY_KEYWORDS } from '../models/transaction.model';
+import { TransactionStorageService } from './transaction-storage.service';
 
 // Bank sender IDs to monitor
 export const BANK_SENDERS = [
@@ -24,6 +25,7 @@ export const BANK_SENDERS = [
   providedIn: 'root'
 })
 export class SmsParserService {
+  private storage = inject(TransactionStorageService);
 
   /**
    * Check if the SMS sender is a bank we monitor
@@ -513,13 +515,40 @@ export class SmsParserService {
   }
 
   /**
-   * Determine the source bank/card
+   * Build the value written to the Source column (column Z) of the sheet.
+   *
+   * Priority order:
+   *   1. The user's master register (Summary tab A41:E60), cached locally —
+   *      for each card, if every comma-separated keyword (case-insensitive
+   *      substring) appears in the SMS sender or body, return that card's
+   *      NAME (e.g. "HDFC Credit Card"). Liability SUMIF then matches column
+   *      Z exactly against the card name.
+   *   2. Generic bank-tag fallback (HDFC CC, Axis, SBI, ...) for SMSes that
+   *      don't belong to any registered card. Lets transaction history stay
+   *      categorized even before liabilities are configured.
    */
   private determineSource(sender: string, message: string): string {
     const upperSender = sender.toUpperCase();
     const upperMessage = message.toUpperCase();
 
-    // Check for credit card indicators in message
+    // 1. Try matching against user-defined liabilities (data-driven).
+    const liabilities = this.storage.liabilities();
+    for (const liab of liabilities) {
+      if (!liab.sourceKeyword) continue;
+      const tokens = liab.sourceKeyword
+        .split(',')
+        .map(t => t.trim().toUpperCase())
+        .filter(t => t.length > 0);
+      if (tokens.length === 0) continue;
+      const allMatch = tokens.every(
+        t => upperSender.includes(t) || upperMessage.includes(t)
+      );
+      if (allMatch) {
+        return liab.name;
+      }
+    }
+
+    // 2. Generic fallback — used when SMS doesn't match any registered card.
     if (upperMessage.includes('CREDIT CARD') || upperMessage.includes('CC')) {
       if (upperSender.includes('HDFC') || upperMessage.includes('HDFC')) return 'HDFC CC';
       if (upperSender.includes('AXIS') || upperMessage.includes('AXIS')) return 'Axis CC';
@@ -527,7 +556,6 @@ export class SmsParserService {
       return 'Credit Card';
     }
 
-    // Sender-based detection
     if (upperSender.includes('HDFCCC') || upperSender.includes('HDFCBK')) return 'HDFC';
     if (upperSender.includes('AXISCC') || upperSender.includes('AXISBK')) return 'Axis';
     if (upperSender.includes('SBI') || upperSender.includes('SBICRD')) return 'SBI';

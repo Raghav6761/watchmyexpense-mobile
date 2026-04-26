@@ -5,6 +5,7 @@ import {
   TransactionStatus,
   ParsedSms,
   Categories,
+  MasterLiability,
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES
 } from '../models/transaction.model';
@@ -12,6 +13,7 @@ import {
 const STORAGE_KEYS = {
   TRANSACTIONS: 'payment_tracker_transactions',
   CATEGORIES: 'payment_tracker_categories',
+  LIABILITIES: 'payment_tracker_liabilities_master',
   BACKEND_URL: 'payment_tracker_backend_url',
   SHEET_NAME_PATTERN: 'payment_tracker_sheet_pattern',
   YEAR_START_MONTH: 'payment_tracker_year_start_month'
@@ -27,6 +29,7 @@ export class TransactionStorageService {
     expense: DEFAULT_EXPENSE_CATEGORIES,
     income: DEFAULT_INCOME_CATEGORIES
   });
+  private _liabilities = signal<MasterLiability[]>([]);
   private _backendUrl = signal<string>('https://api.watchmyexpense.com');
   private _sheetNamePattern = signal<string>('Monthly budget {month} {year}');
   private _yearStartMonth = signal<number>(1); // 1=January, 4=April, etc.
@@ -34,6 +37,7 @@ export class TransactionStorageService {
   // Public readonly signals
   public transactions = this._transactions.asReadonly();
   public categories = this._categories.asReadonly();
+  public liabilities = this._liabilities.asReadonly();
   public backendUrl = this._backendUrl.asReadonly();
   public sheetNamePattern = this._sheetNamePattern.asReadonly();
   public yearStartMonth = this._yearStartMonth.asReadonly();
@@ -102,6 +106,14 @@ export class TransactionStorageService {
       });
       if (categoriesJson) {
         this._categories.set(JSON.parse(categoriesJson));
+      }
+
+      // Load liabilities master register
+      const { value: liabilitiesJson } = await Preferences.get({
+        key: STORAGE_KEYS.LIABILITIES
+      });
+      if (liabilitiesJson) {
+        this._liabilities.set(JSON.parse(liabilitiesJson));
       }
 
       // Load backend URL
@@ -290,6 +302,18 @@ export class TransactionStorageService {
     await Preferences.set({
       key: STORAGE_KEYS.CATEGORIES,
       value: JSON.stringify(categories)
+    });
+  }
+
+  /**
+   * Update the liability master register cache (called after fetch from backend
+   * or after local edits). Persisted so the SMS parser can match cards offline.
+   */
+  async updateLiabilities(liabilities: MasterLiability[]): Promise<void> {
+    this._liabilities.set(liabilities);
+    await Preferences.set({
+      key: STORAGE_KEYS.LIABILITIES,
+      value: JSON.stringify(liabilities)
     });
   }
 
