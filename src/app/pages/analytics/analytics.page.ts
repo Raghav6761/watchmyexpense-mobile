@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import {
   IonHeader,
   IonToolbar,
@@ -23,7 +25,12 @@ import {
   IonProgressBar,
   IonText,
   IonSpinner,
-  IonChip
+  IonChip,
+  IonItemSliding,
+  IonItemOptions,
+  IonItemOption,
+  AlertController,
+  ToastController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -32,11 +39,17 @@ import {
   walletOutline,
   trendingUpOutline,
   trendingDownOutline,
-  cashOutline
+  cashOutline,
+  addOutline,
+  createOutline,
+  trashOutline,
+  cardOutline
 } from 'ionicons/icons';
 import { Chart, registerables } from 'chart.js';
 
 import { AnalyticsService, MonthlySnapshot, MonthlyBudgetData } from '../../services/analytics.service';
+import { TransactionStorageService } from '../../services/transaction-storage.service';
+import { MasterLiability } from '../../models/transaction.model';
 
 Chart.register(...registerables);
 
@@ -66,7 +79,10 @@ Chart.register(...registerables);
     IonProgressBar,
     IonText,
     IonSpinner,
-    IonChip
+    IonChip,
+    IonItemSliding,
+    IonItemOptions,
+    IonItemOption
   ],
   template: `
     <ion-header>
@@ -159,11 +175,9 @@ Chart.register(...registerables);
               <ion-label>Budget</ion-label>
             </ion-segment-button>
           }
-          @if (liabilities() && liabilities()!.length > 0) {
-            <ion-segment-button value="liabilities">
-              <ion-label>Liabilities</ion-label>
-            </ion-segment-button>
-          }
+          <ion-segment-button value="liabilities">
+            <ion-label>Liabilities</ion-label>
+          </ion-segment-button>
           <ion-segment-button value="trends">
             <ion-label>Trends</ion-label>
           </ion-segment-button>
@@ -307,56 +321,93 @@ Chart.register(...registerables);
         }
 
         <!-- Liabilities Dashboard -->
-        @if (viewSegment === 'liabilities' && liabilities()) {
-          @if (totalLiabilities() > 0) {
-            <ion-card class="liability-total-card">
+        @if (viewSegment === 'liabilities') {
+          @if (isLoadingLiabilities()) {
+            <div class="liability-loading">
+              <ion-spinner name="crescent"></ion-spinner>
+              <p>Loading liabilities...</p>
+            </div>
+          } @else if (masterLiabilities().length === 0) {
+            <div class="empty-state">
+              <ion-icon name="wallet-outline" class="empty-icon"></ion-icon>
+              <p>No cards or loans registered yet</p>
+              <ion-button fill="solid" (click)="addMaster()">
+                <ion-icon slot="start" name="add-outline"></ion-icon>
+                Add Card / Loan
+              </ion-button>
+            </div>
+          } @else {
+            <ion-card>
               <ion-card-content>
-                <div class="liability-total">
+                <!-- Donut chart of outstanding by card (only when there's something to show) -->
+                @if (liabilityChartData().length > 0) {
+                  <div class="chart-container">
+                    <canvas #liabilityChart></canvas>
+                  </div>
+                } @else {
+                  <div class="liability-no-chart">
+                    <ion-icon name="wallet-outline"></ion-icon>
+                    <p>No outstanding this month</p>
+                  </div>
+                }
+
+                <!-- Total Outstanding summary row -->
+                <div class="liability-total-row">
                   <span class="liability-total-label">Total Outstanding</span>
                   <span class="liability-total-value">{{ totalLiabilities() | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
                 </div>
-              </ion-card-content>
-            </ion-card>
-          }
 
-          @for (item of liabilities()!; track item.name) {
-            <ion-card class="liability-card" [class.paid-full]="item.outstanding <= 0 && item.spent > 0" [class.due-soon]="isDueSoon(item.dueDate) && item.outstanding > 0" [class.unpaid]="item.outstanding > 0 && item.paid === 0">
-              <ion-card-content>
-                <div class="liability-header">
-                  <span class="liability-name">{{ item.name }}</span>
-                  <ion-chip [color]="item.outstanding <= 0 && item.spent > 0 ? 'success' : (item.paid === 0 && item.outstanding > 0 ? 'danger' : 'warning')" outline="true">
-                    {{ item.outstanding <= 0 && item.spent > 0 ? 'Paid' : (item.paid === 0 && item.outstanding > 0 ? 'Unpaid' : 'Partial') }}
-                  </ion-chip>
-                </div>
-                <div class="liability-details">
-                  <div class="liability-detail">
-                    <span class="detail-label">Spent</span>
-                    <span class="detail-value">{{ item.spent | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
-                  </div>
-                  <div class="liability-detail">
-                    <span class="detail-label">Paid</span>
-                    <span class="detail-value paid-value">{{ item.paid | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
-                  </div>
-                  <div class="liability-detail">
-                    <span class="detail-label">Outstanding</span>
-                    <span class="detail-value outstanding-value">{{ item.outstanding | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
-                  </div>
-                  @if (item.dueDate) {
-                    <div class="liability-detail">
-                      <span class="detail-label">Due Date</span>
-                      <span class="detail-value">{{ item.dueDate }}</span>
-                    </div>
+                <!-- Per-card list. Tap a row to update Paid / Due / Min Due. -->
+                <!-- Swipe a row to access Edit / Delete master settings.    -->
+                <ion-list>
+                  @for (card of unifiedLiabilities(); track card.name) {
+                    <ion-item-sliding>
+                      <ion-item button (click)="openLiabilityDetail(card.name)" detail="true"
+                        [class.paid-full]="card.outstanding <= 0 && card.spent > 0"
+                        [class.due-soon]="isDueSoon(card.dueDate) && card.outstanding > 0"
+                        [class.unpaid]="card.outstanding > 0 && card.paid === 0">
+                        <ion-label>
+                          <h3>{{ card.name }}</h3>
+                          <p class="liability-meta">
+                            @if (card.creditLimit) {
+                              Limit: {{ card.creditLimit | currency:'INR':'symbol-narrow':'1.0-0' }}
+                            }
+                            @if (card.billingCycle) {
+                              &middot; {{ card.billingCycle }}
+                            }
+                          </p>
+                          <p class="liability-stats-line">
+                            Spent {{ card.spent | currency:'INR':'symbol-narrow':'1.0-0' }}
+                            &middot; Paid <span class="paid-value">{{ card.paid | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                          </p>
+                          @if (card.sourceKeyword) {
+                            <p class="source-hint">Auto-tracks: "{{ card.sourceKeyword }}"</p>
+                          }
+                        </ion-label>
+                        <ion-note slot="end" class="liability-amount">
+                          {{ card.outstanding | currency:'INR':'symbol-narrow':'1.0-0' }}
+                          <br><small>outstanding</small>
+                        </ion-note>
+                      </ion-item>
+                      <ion-item-options side="end">
+                        <ion-item-option color="primary" (click)="editMaster(card)">
+                          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+                        </ion-item-option>
+                        <ion-item-option color="danger" (click)="deleteMaster(card.name)">
+                          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                        </ion-item-option>
+                      </ion-item-options>
+                    </ion-item-sliding>
                   }
-                </div>
+                </ion-list>
+
+                <!-- Helper add button — small, secondary, at the bottom. -->
+                <ion-button fill="clear" size="small" class="add-card-helper" (click)="addMaster()">
+                  <ion-icon slot="start" name="add-outline"></ion-icon>
+                  Add another card / loan
+                </ion-button>
               </ion-card-content>
             </ion-card>
-          }
-
-          @if (liabilities()!.length === 0) {
-            <div class="empty-state">
-              <ion-icon name="wallet-outline" class="empty-icon"></ion-icon>
-              <p>No liabilities this month</p>
-            </div>
           }
         }
 
@@ -554,41 +605,66 @@ Chart.register(...registerables);
       font-weight: 700;
     }
 
-    .liability-total-card { margin: 12px; }
-    .liability-total {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .liability-total-label { font-size: 16px; font-weight: 600; }
-    .liability-total-value { font-size: 20px; font-weight: 700; color: var(--ion-color-danger); }
-
-    .liability-card { margin: 8px 12px; }
-    .liability-card.paid-full { border-left: 4px solid var(--ion-color-success); }
-    .liability-card.due-soon { border-left: 4px solid var(--ion-color-warning); }
-    .liability-card.unpaid { border-left: 4px solid var(--ion-color-danger); }
-
-    .liability-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .liability-name { font-size: 16px; font-weight: 600; }
-
-    .liability-details {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .liability-detail {
+    .liability-loading {
       display: flex;
       flex-direction: column;
+      align-items: center;
+      padding: 32px;
+      color: var(--ion-color-medium);
     }
-    .detail-label { font-size: 11px; color: var(--ion-color-medium); }
-    .detail-value { font-size: 14px; font-weight: 500; }
-    .paid-value { color: var(--ion-color-success); }
-    .outstanding-value { color: var(--ion-color-danger); }
+    .liability-loading p { margin-top: 8px; font-size: 14px; }
+
+    .liability-no-chart {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      color: var(--ion-color-medium);
+    }
+    .liability-no-chart ion-icon { font-size: 36px; margin-bottom: 6px; }
+    .liability-no-chart p { font-size: 13px; margin: 0; }
+
+    .liability-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 4px 12px;
+      border-bottom: 1px solid var(--ion-color-light);
+      margin-bottom: 4px;
+    }
+    .liability-total-label { font-size: 14px; font-weight: 600; color: var(--ion-color-medium); }
+    .liability-total-value { font-size: 18px; font-weight: 700; color: var(--ion-color-danger); }
+
+    .liability-meta { font-size: 12px; color: var(--ion-color-medium); }
+    .liability-stats-line { font-size: 12px; color: var(--ion-color-medium); }
+    .liability-stats-line .paid-value { color: var(--ion-color-success); font-weight: 600; }
+
+    .source-hint {
+      color: var(--ion-color-primary);
+      font-size: 11px;
+      font-style: italic;
+    }
+
+    .liability-amount {
+      text-align: right;
+      color: var(--ion-color-danger);
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .liability-amount small {
+      font-weight: normal;
+      font-size: 10px;
+      color: var(--ion-color-medium);
+    }
+
+    ion-item.paid-full { --border-color: var(--ion-color-success); border-left: 3px solid var(--ion-color-success); }
+    ion-item.due-soon { --border-color: var(--ion-color-warning); border-left: 3px solid var(--ion-color-warning); }
+    ion-item.unpaid { --border-color: var(--ion-color-danger); border-left: 3px solid var(--ion-color-danger); }
+
+    .add-card-helper {
+      margin-top: 8px;
+      --color: var(--ion-color-primary);
+    }
 
     .top-cat-row {
       display: flex;
@@ -603,6 +679,10 @@ Chart.register(...registerables);
 })
 export class AnalyticsPage implements OnInit {
   private router = inject(Router);
+  private http = inject(HttpClient);
+  private storage = inject(TransactionStorageService);
+  private alertCtrl = inject(AlertController);
+  private toastCtrl = inject(ToastController);
   analytics = inject(AnalyticsService);
 
   snapshot = signal<MonthlySnapshot | null>(null);
@@ -610,9 +690,46 @@ export class AnalyticsPage implements OnInit {
   balance = signal<{ startBalance: number; endBalance: number; savings: number } | null>(null);
   liabilities = signal<{ name: string; spent: number; paid: number; outstanding: number; dueDate: string; minDue: number }[] | null>(null);
   totalLiabilities = signal(0);
+  masterLiabilities = signal<MasterLiability[]>([]);
+  isLoadingLiabilities = signal(false);
+
+  // Master register joined with this-month rows. Every registered card always
+  // appears in the list — if monthly data is missing for a card, its stats
+  // default to 0 so the row is still rendered. Lets the user see every card
+  // even before any spending has been picked up.
+  unifiedLiabilities = computed(() => {
+    const master = this.masterLiabilities();
+    const monthly = this.liabilities() || [];
+    const monthlyMap = new Map(monthly.map(m => [m.name, m]));
+    return master.map(card => {
+      const m = monthlyMap.get(card.name);
+      return {
+        name: card.name,
+        creditLimit: card.creditLimit,
+        interestRate: card.interestRate,
+        billingCycle: card.billingCycle,
+        sourceKeyword: card.sourceKeyword,
+        spent: m?.spent || 0,
+        paid: m?.paid || 0,
+        outstanding: m?.outstanding || 0,
+        dueDate: m?.dueDate || '',
+        minDue: m?.minDue || 0
+      };
+    });
+  });
+
+  // Chart data: outstanding per card, only including cards with non-zero
+  // outstanding so the donut isn't a sea of zero slices.
+  liabilityChartData = computed(() => {
+    return this.unifiedLiabilities()
+      .filter(c => c.outstanding > 0)
+      .map(c => ({ category: c.name, amount: c.outstanding }));
+  });
 
   viewSegment: 'expenses' | 'income' | 'daily' | 'budget' | 'liabilities' | 'trends' = 'expenses';
   topCategories: { category: string; avgAmount: number }[] = [];
+
+  private get baseUrl() { return this.storage.backendUrl(); }
 
   Math = Math; // expose to template
 
@@ -621,12 +738,14 @@ export class AnalyticsPage implements OnInit {
   @ViewChild('dailyChart') dailyChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('trendChart') trendChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('savingsChart') savingsChartRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('liabilityChart') liabilityChartRef!: ElementRef<HTMLCanvasElement>;
 
   private expenseChartInstance?: Chart;
   private incomeChartInstance?: Chart;
   private dailyChartInstance?: Chart;
   private trendChartInstance?: Chart;
   private savingsChartInstance?: Chart;
+  private liabilityChartInstance?: Chart;
 
   private chartColors = [
     '#E87526', '#009688', '#374759', '#4A86C8', '#CC0000',
@@ -638,31 +757,46 @@ export class AnalyticsPage implements OnInit {
   constructor() {
     addIcons({
       chevronBackOutline, chevronForwardOutline,
-      walletOutline, trendingUpOutline, trendingDownOutline, cashOutline
+      walletOutline, trendingUpOutline, trendingDownOutline, cashOutline,
+      addOutline, createOutline, trashOutline, cardOutline
     });
   }
 
   ngOnInit() {
+    // Initial load is handled by ionViewWillEnter so the same refresh-on-entry
+    // behavior fires on first mount and on every subsequent visit. Avoids a
+    // duplicate fetch on first mount.
+  }
+
+  // Fires every time the Analytics tab becomes active (Ionic-specific).
+  // Pattern matches what the user sees in Liabilities: local cached data shows
+  // immediately (snapshot is computed from in-memory transactions); backend
+  // fetches go out in parallel and update the corresponding signal as each
+  // resolves. Liabilities have their own loader because they also auto-init.
+  async ionViewWillEnter() {
     this.loadData();
+    await this.loadLiabilitiesData();
+    // After liabilities resolve, re-render the active chart in case the user
+    // is sitting on the Liabilities tab and it just got fresh data.
+    setTimeout(() => this.renderCharts(), 50);
   }
 
   prevMonth() {
     this.analytics.navigateMonth(-1);
     this.loadData();
+    this.loadLiabilitiesData();
   }
 
   nextMonth() {
     this.analytics.navigateMonth(1);
     this.loadData();
+    this.loadLiabilitiesData();
   }
 
   onSegmentChange() {
-    setTimeout(() => {
-      this.renderCharts();
-      if (this.viewSegment === 'trends') {
-        this.renderTrendCharts();
-      }
-    }, 100);
+    // renderCharts already routes to the right method per active segment
+    // (expenses / income / daily / trends / liabilities).
+    setTimeout(() => this.renderCharts(), 100);
   }
 
   hasTrendData(): boolean {
@@ -684,40 +818,59 @@ export class AnalyticsPage implements OnInit {
     });
   }
 
-  async loadData() {
-    this.snapshot.set(this.analytics.getMonthlySnapshot());
-
-    // Fetch budget data from backend (non-blocking)
-    this.analytics.fetchBudgetData().then(data => {
-      this.budgetData.set(data);
+  openLiabilityDetail(name: string) {
+    this.router.navigate(['/liability-detail'], {
+      queryParams: { name }
     });
-
-    this.analytics.fetchBalanceData().then(data => {
-      this.balance.set(data);
-    });
-
-    this.analytics.fetchLiabilities().then(data => {
-      this.liabilities.set(data);
-      if (data) {
-        this.totalLiabilities.set(data.reduce((sum, l) => sum + (l.outstanding || 0), 0));
-      }
-    });
-
-    setTimeout(() => this.renderCharts(), 200);
   }
 
+  async loadData() {
+    // 1. Show whatever's in local storage immediately so the user sees data
+    //    instantly (no spinner on top-level numbers / charts).
+    this.snapshot.set(this.analytics.getMonthlySnapshot());
+
+    // 2. Fire all backend fetches in parallel. Each updates its own signal
+    //    when the response lands — none of them block the others.
+    this.analytics.fetchBudgetData().then(data => this.budgetData.set(data));
+    this.analytics.fetchBalanceData().then(data => this.balance.set(data));
+
+    // 3. Pull raw transactions from the sheet → updates local cache → re-snap
+    //    the analytics view. This is what makes Spent / Earned / Saved /
+    //    Expenses / Income / Daily / Trends "live": their numbers come from
+    //    the snapshot which is recomputed from the freshly-pulled cache.
+    const year = this.analytics.selectedYear();
+    const month = this.analytics.selectedMonth();
+    this.analytics.pullTransactions(year, month).then(() => {
+      this.snapshot.set(this.analytics.getMonthlySnapshot());
+      setTimeout(() => this.renderCharts(), 50);
+    });
+
+    // 4. Initial chart render with local cache data — don't wait for the pull
+    //    to complete (the pull's .then will re-render on top of this).
+    setTimeout(() => this.renderCharts(), 100);
+  }
+
+  // Re-renders the chart for whichever segment is currently active. Called
+  // both from onSegmentChange (when the user switches tabs) and from the
+  // post-fetch paths in ionViewWillEnter / loadData / loadLiabilitiesData,
+  // so each sub-tab redraws with the latest data on every entry.
   private renderCharts() {
     const snap = this.snapshot();
-    if (!snap) return;
 
-    if (this.viewSegment === 'expenses' && this.expenseChartRef) {
+    if (this.viewSegment === 'expenses' && snap && this.expenseChartRef) {
       this.renderDonutChart('expense', snap.expensesByCategory);
     }
-    if (this.viewSegment === 'income' && this.incomeChartRef) {
+    if (this.viewSegment === 'income' && snap && this.incomeChartRef) {
       this.renderDonutChart('income', snap.incomeByCategory);
     }
-    if (this.viewSegment === 'daily' && this.dailyChartRef) {
+    if (this.viewSegment === 'daily' && snap && this.dailyChartRef) {
       this.renderDailyChart(snap.dailyExpenses);
+    }
+    if (this.viewSegment === 'trends') {
+      this.renderTrendCharts();
+    }
+    if (this.viewSegment === 'liabilities') {
+      this.renderLiabilityChart();
     }
   }
 
@@ -754,6 +907,40 @@ export class AnalyticsPage implements OnInit {
 
     if (type === 'expense') this.expenseChartInstance = chart;
     else this.incomeChartInstance = chart;
+  }
+
+  private renderLiabilityChart() {
+    const data = this.liabilityChartData();
+    if (!this.liabilityChartRef?.nativeElement) return;
+    if (this.liabilityChartInstance) {
+      this.liabilityChartInstance.destroy();
+      this.liabilityChartInstance = undefined;
+    }
+    if (data.length === 0) return; // no outstanding to chart
+
+    this.liabilityChartInstance = new Chart(this.liabilityChartRef.nativeElement, {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => d.category),
+        datasets: [{
+          data: data.map(d => d.amount),
+          backgroundColor: this.chartColors.slice(0, data.length),
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { boxWidth: 12, font: { size: 11 } }
+          }
+        },
+        cutout: '60%'
+      }
+    });
   }
 
   private renderDailyChart(data: { day: number; amount: number }[]) {
@@ -883,5 +1070,198 @@ export class AnalyticsPage implements OnInit {
         }
       });
     }
+  }
+
+  // ─── Liability data loading + auto-init ─────────────────────────────
+  //
+  // Called on every entry to the Analytics tab and on month navigation.
+  // Sequence:
+  //   1. Fetch master register + this month's monthly rows in parallel.
+  //   2. For every master card with no monthly row this month, create one
+  //      (zeros). This is what replaces the old "Initialize from registered
+  //      cards" button — but we only init the *missing* cards, so any Paid
+  //      amount the user already entered survives.
+  //   3. Refetch monthly so the just-created rows appear in the UI.
+  async loadLiabilitiesData() {
+    this.isLoadingLiabilities.set(true);
+    try {
+      const [masterRes, monthly] = await Promise.all([
+        firstValueFrom(this.http.get<{ liabilities: MasterLiability[] }>(`${this.baseUrl}/api/liabilities/master`)),
+        this.analytics.fetchLiabilities()
+      ]);
+
+      const master = masterRes.liabilities || [];
+      this.masterLiabilities.set(master);
+      await this.storage.updateLiabilities(master);
+
+      const monthlyList = monthly || [];
+      const monthlyNames = new Set(monthlyList.map(m => m.name));
+      const missing = master.filter(card => !monthlyNames.has(card.name));
+
+      if (missing.length > 0) {
+        const now = new Date().toISOString();
+        await Promise.all(missing.map(card =>
+          firstValueFrom(this.http.post(`${this.baseUrl}/api/liabilities`, {
+            date: now,
+            name: card.name,
+            spent: 0, paid: 0, outstanding: 0, dueDate: '', minDue: 0
+          })).catch(err => console.error(`Auto-init failed for ${card.name}:`, err))
+        ));
+        const refreshed = await this.analytics.fetchLiabilities();
+        this.liabilities.set(refreshed || []);
+      } else {
+        this.liabilities.set(monthlyList);
+      }
+
+      const current = this.liabilities();
+      this.totalLiabilities.set(
+        current ? current.reduce((sum, l) => sum + (l.outstanding || 0), 0) : 0
+      );
+    } catch (error) {
+      console.error('Error loading liabilities:', error);
+    } finally {
+      this.isLoadingLiabilities.set(false);
+    }
+  }
+
+  async addMaster() {
+    const alert = await this.alertCtrl.create({
+      header: 'Add Card / Loan',
+      inputs: [
+        { name: 'name', type: 'text', placeholder: 'Name (e.g. HDFC Credit Card)' },
+        { name: 'sourceKeyword', type: 'text', placeholder: 'Match keywords (e.g. "HDFC, 1525") — comma-separated, all must match' },
+        { name: 'creditLimit', type: 'number', placeholder: 'Credit Limit / Principal' },
+        { name: 'interestRate', type: 'number', placeholder: 'Interest Rate %' },
+        { name: 'billingCycle', type: 'text', placeholder: 'Billing Cycle (e.g. 1st-30th)' }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Add',
+          handler: async (data) => {
+            if (!data.name?.trim()) return false;
+            try {
+              await firstValueFrom(this.http.post(`${this.baseUrl}/api/liabilities/master`, {
+                name: data.name.trim(),
+                creditLimit: parseFloat(data.creditLimit) || 0,
+                interestRate: parseFloat(data.interestRate) || 0,
+                billingCycle: data.billingCycle || '',
+                sourceKeyword: data.sourceKeyword?.trim() || ''
+              }));
+              await this.loadLiabilitiesData();
+              await this.showToast(`"${data.name}" added`, 'success');
+            } catch {
+              await this.showToast('Failed to add', 'danger');
+            }
+            return true;
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async editMaster(item: MasterLiability) {
+    const alert = await this.alertCtrl.create({
+      header: 'Edit Card / Loan',
+      inputs: [
+        { name: 'name', type: 'text', value: item.name, placeholder: 'Name' },
+        { name: 'sourceKeyword', type: 'text', value: item.sourceKeyword || '', placeholder: 'Source keyword (e.g. HDFC, 1525)' },
+        { name: 'creditLimit', type: 'number', value: item.creditLimit?.toString() || '', placeholder: 'Credit Limit' },
+        { name: 'interestRate', type: 'number', value: item.interestRate?.toString() || '', placeholder: 'Interest Rate %' },
+        { name: 'billingCycle', type: 'text', value: item.billingCycle || '', placeholder: 'Billing Cycle' }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          handler: async (data) => {
+            if (!data.name?.trim()) return false;
+            try {
+              await firstValueFrom(this.http.post(`${this.baseUrl}/api/liabilities/master`, {
+                name: data.name.trim(),
+                creditLimit: parseFloat(data.creditLimit) || 0,
+                interestRate: parseFloat(data.interestRate) || 0,
+                billingCycle: data.billingCycle || '',
+                sourceKeyword: data.sourceKeyword?.trim() || ''
+              }));
+              await this.loadLiabilitiesData();
+              await this.showToast('Updated', 'success');
+            } catch {
+              await this.showToast('Failed to update', 'danger');
+            }
+            return true;
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async deleteMaster(name: string) {
+    const alert = await this.alertCtrl.create({
+      header: 'Delete',
+      message: `Remove "${name}" from registered cards/loans?`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Delete',
+          handler: async () => {
+            try {
+              await firstValueFrom(this.http.post(`${this.baseUrl}/api/liabilities/master/delete`, { name }));
+              await this.loadLiabilitiesData();
+              await this.showToast(`"${name}" removed`, 'success');
+            } catch {
+              await this.showToast('Failed to delete', 'danger');
+            }
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async updateMonthly(item: { name: string; spent: number; paid: number; outstanding: number; dueDate: string; minDue: number }) {
+    const alert = await this.alertCtrl.create({
+      header: item.name,
+      message: 'Update this month\'s values',
+      inputs: [
+        { name: 'paid', type: 'number', value: item.paid?.toString() || '0', placeholder: 'Paid' },
+        { name: 'dueDate', type: 'text', value: item.dueDate || '', placeholder: 'Due Date (e.g. 15/04/2026)' },
+        { name: 'minDue', type: 'number', value: item.minDue?.toString() || '0', placeholder: 'Min Due' }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          handler: async (data) => {
+            try {
+              const now = new Date().toISOString();
+              await firstValueFrom(this.http.post(`${this.baseUrl}/api/liabilities`, {
+                date: now,
+                name: item.name,
+                spent: item.spent || 0,
+                paid: parseFloat(data.paid) || 0,
+                outstanding: 0,  // backend overwrites with =P-Q formula
+                dueDate: data.dueDate || '',
+                minDue: parseFloat(data.minDue) || 0
+              }));
+              await this.loadLiabilitiesData();
+              await this.showToast('Updated', 'success');
+            } catch {
+              await this.showToast('Failed to update', 'danger');
+            }
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  private async showToast(message: string, color: string) {
+    const toast = await this.toastCtrl.create({
+      message, duration: 2000, color, position: 'bottom'
+    });
+    await toast.present();
   }
 }

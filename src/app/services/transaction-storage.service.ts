@@ -369,6 +369,16 @@ export class TransactionStorageService {
   }
 
   /**
+   * Replace the entire local transactions list. Used by the pullTransactions
+   * flow — caller is responsible for deciding the merged shape (e.g. preserve
+   * pending/ready/error rows, swap in synced rows from backend).
+   */
+  async replaceAllTransactions(transactions: Transaction[]): Promise<void> {
+    this._transactions.set(transactions);
+    await this.saveTransactions();
+  }
+
+  /**
    * Add manual transaction
    */
   async addManualTransaction(

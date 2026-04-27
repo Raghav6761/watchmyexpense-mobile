@@ -1,7 +1,18 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { TransactionStorageService } from './transaction-storage.service';
 import { SyncService } from './sync.service';
-import { Transaction } from '../models/transaction.model';
+import { Transaction, TransactionType } from '../models/transaction.model';
+
+interface BackendTransaction {
+  type: TransactionType;
+  date: string;          // ISO 8601
+  amount: number;
+  description: string;
+  category: string;
+  source: string;
+}
 
 export interface CategoryBreakdown {
   category: string;
@@ -49,6 +60,7 @@ export interface MonthlyBudgetData {
 export class AnalyticsService {
   private storage = inject(TransactionStorageService);
   private syncService = inject(SyncService);
+  private http = inject(HttpClient);
 
   private _selectedYear = signal(new Date().getFullYear());
   private _selectedMonth = signal(new Date().getMonth() + 1); // 1-based
@@ -101,6 +113,10 @@ export class AnalyticsService {
     };
   }
 
+  // All three fetch* methods below MUST use HttpClient (not native fetch) so
+  // requests pass through authInterceptor and pick up the JWT bearer token.
+  // Native fetch bypasses Angular's interceptor chain → 401 from requireAuth.
+
   async fetchBudgetData(): Promise<MonthlyBudgetData | null> {
     if (!this.syncService.isAuthenticated()) return null;
 
@@ -108,13 +124,9 @@ export class AnalyticsService {
       const year = this._selectedYear();
       const month = this._selectedMonth();
       const baseUrl = this.storage.backendUrl();
-
-      const response = await fetch(
-        `${baseUrl}/api/budget/${year}/${month}`
+      return await firstValueFrom(
+        this.http.get<MonthlyBudgetData>(`${baseUrl}/api/budget/${year}/${month}`)
       );
-
-      if (!response.ok) return null;
-      return await response.json();
     } catch {
       return null;
     }
@@ -127,16 +139,68 @@ export class AnalyticsService {
       const year = this._selectedYear();
       const month = this._selectedMonth();
       const baseUrl = this.storage.backendUrl();
-
-      const response = await fetch(
-        `${baseUrl}/api/liabilities/${year}/${month}`
+      const data = await firstValueFrom(
+        this.http.get<{ liabilities: { name: string; spent: number; paid: number; outstanding: number; dueDate: string; minDue: number }[] }>(
+          `${baseUrl}/api/liabilities/${year}/${month}`
+        )
       );
-
-      if (!response.ok) return null;
-      const data = await response.json();
       return data.liabilities || [];
     } catch {
       return null;
+    }
+  }
+
+  // Fetch raw transactions for a month from the sheet and merge into local
+  // storage. Strategy:
+  //   - Backend rows are the source of truth for SYNCED transactions in this
+  //     month → replace those with the backend's version.
+  //   - Local rows that are pending / ready / error haven't reached the sheet
+  //     yet → keep them untouched, otherwise we'd lose user-entered data that
+  //     hasn't synced.
+  //   - Anything outside this month is left alone.
+  // IDs for backend rows are synthesized deterministically from
+  // (type|timestamp|amount|description|source) so re-pulls don't churn IDs.
+  async pullTransactions(year: number, month: number): Promise<void> {
+    if (!this.syncService.isAuthenticated()) return;
+
+    try {
+      const baseUrl = this.storage.backendUrl();
+      const data = await firstValueFrom(
+        this.http.get<{ transactions: BackendTransaction[] }>(
+          `${baseUrl}/api/transactions/${year}/${month}`
+        )
+      );
+
+      const remote: Transaction[] = (data.transactions || []).map(t => {
+        const dt = new Date(t.date);
+        const safeDesc = (t.description || '').slice(0, 30).replace(/\s+/g, '_');
+        const id = `srv_${t.type}_${dt.getTime()}_${t.amount}_${safeDesc}_${t.source || ''}`;
+        return {
+          id,
+          type: t.type,
+          amount: t.amount,
+          date: dt,
+          merchant: t.description || '',
+          description: t.description || '',
+          category: t.category || '',
+          source: t.source || '',
+          status: 'synced' as const,
+          createdAt: dt,
+          syncedAt: new Date()
+        };
+      });
+
+      const inMonth = (t: Transaction) => {
+        const d = new Date(t.date);
+        return d.getFullYear() === year && d.getMonth() + 1 === month;
+      };
+
+      const existing = this.storage.transactions();
+      const preserved = existing.filter(t => !inMonth(t) || t.status !== 'synced');
+
+      await this.storage.replaceAllTransactions([...preserved, ...remote]);
+    } catch (error) {
+      console.error('Failed to pull transactions:', error);
     }
   }
 
@@ -147,13 +211,11 @@ export class AnalyticsService {
       const year = this._selectedYear();
       const month = this._selectedMonth();
       const baseUrl = this.storage.backendUrl();
-
-      const response = await fetch(
-        `${baseUrl}/api/balance/${year}/${month}`
+      return await firstValueFrom(
+        this.http.get<{ startBalance: number; endBalance: number; savings: number }>(
+          `${baseUrl}/api/balance/${year}/${month}`
+        )
       );
-
-      if (!response.ok) return null;
-      return await response.json();
     } catch {
       return null;
     }

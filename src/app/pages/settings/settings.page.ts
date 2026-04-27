@@ -140,13 +140,6 @@ import { Capacitor } from '@capacitor/core';
           </ion-label>
         </ion-item>
 
-        <ion-item button routerLink="/liabilities">
-          <ion-icon name="card-outline" slot="start" color="warning"></ion-icon>
-          <ion-label>
-            <h2>Manage Liabilities</h2>
-            <p>Credit cards, loans & monthly payments</p>
-          </ion-label>
-        </ion-item>
       </ion-list>
 
       <!-- Authentication -->
