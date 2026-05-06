@@ -20,7 +20,7 @@ import { closeOutline, checkmarkOutline, timeOutline, walletOutline, calendarOut
 
 import { Transaction } from '../../models/transaction.model';
 import { TransactionStorageService } from '../../services/transaction-storage.service';
-import { SmsParserService } from '../../services/sms-parser.service';
+import { CATEGORY_KEYWORDS } from '../../models/transaction.model';
 import { SyncService } from '../../services/sync.service';
 
 @Component({
@@ -357,7 +357,6 @@ export class TransactionOverlayComponent implements OnInit {
   private modalCtrl = inject(ModalController);
   private alertCtrl = inject(AlertController);
   private storage = inject(TransactionStorageService);
-  private smsParser = inject(SmsParserService);
   public syncService = inject(SyncService);
 
   amount = 0;
@@ -436,8 +435,9 @@ export class TransactionOverlayComponent implements OnInit {
     const suggested: string[] = [];
     const availableCategories = this.currentCategories();
 
-    // Try to auto-suggest from merchant name
-    const autoSuggested = this.smsParser.suggestCategory(this.transaction.merchant);
+    // Try to auto-suggest from merchant name using the static keyword map.
+    // (Replaces the old SmsParserService.suggestCategory(); same lookup table.)
+    const autoSuggested = this.suggestCategoryFromMerchant(this.transaction.merchant);
     if (autoSuggested && availableCategories.includes(autoSuggested)) {
       suggested.push(autoSuggested);
     }
@@ -463,6 +463,19 @@ export class TransactionOverlayComponent implements OnInit {
     }
 
     this.suggestedCategories.set(suggested);
+  }
+
+  // Lookup a category by merchant string against CATEGORY_KEYWORDS. Replaces
+  // the old SmsParserService.suggestCategory() now that the SMS service is gone.
+  private suggestCategoryFromMerchant(merchant: string): string | null {
+    if (!merchant) return null;
+    const lower = merchant.toLowerCase();
+    for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+      if (keywords.some(k => lower.includes(k))) {
+        return category;
+      }
+    }
+    return null;
   }
 
   selectCategory(category: string) {

@@ -40,14 +40,11 @@ import {
   cloudUploadOutline,
   trashOutline,
   createOutline,
-  flaskOutline,
   refreshOutline
 } from 'ionicons/icons';
 
 import { TransactionStorageService } from '../../services/transaction-storage.service';
 import { SyncService } from '../../services/sync.service';
-import { SmsListenerService } from '../../services/sms-listener.service';
-import { SmsParserService } from '../../services/sms-parser.service';
 import { TransactionOverlayComponent } from '../../components/transaction-overlay/transaction-overlay.component';
 import { Transaction } from '../../models/transaction.model';
 
@@ -85,11 +82,6 @@ import { Transaction } from '../../models/transaction.model';
       <ion-toolbar>
         <ion-title>Watch My Expense</ion-title>
         <ion-buttons slot="end">
-          @if (isDevMode) {
-            <ion-button (click)="simulateTransaction()" title="Simulate SMS">
-              <ion-icon slot="icon-only" name="flask-outline"></ion-icon>
-            </ion-button>
-          }
           <ion-button (click)="goToSettings()">
             <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
           </ion-button>
@@ -162,13 +154,7 @@ import { Transaction } from '../../models/transaction.model';
         <div class="empty-state">
           <ion-icon name="time-outline" size="large"></ion-icon>
           <h3>No Transactions</h3>
-          <p>Transactions from SMS will appear here automatically.</p>
-          @if (isDevMode) {
-            <ion-button fill="outline" size="small" (click)="simulateTransaction()">
-              <ion-icon name="flask-outline" slot="start"></ion-icon>
-              Simulate SMS
-            </ion-button>
-          }
+          <p>Tap the + button to add your first transaction.</p>
         </div>
       } @else {
         <ion-list>
@@ -345,11 +331,6 @@ export class HomePage implements OnInit {
 
   public storage = inject(TransactionStorageService);
   public syncService = inject(SyncService);
-  private smsListener = inject(SmsListenerService);
-  private smsParser = inject(SmsParserService);
-
-  // Dev mode flag (enable for testing)
-  isDevMode = true; // Set to false in production
 
   constructor() {
     addIcons({
@@ -362,8 +343,7 @@ export class HomePage implements OnInit {
       cloudUploadOutline,
       trashOutline,
       createOutline,
-      flaskOutline,
-      refreshOutline
+          refreshOutline
     });
   }
 
@@ -564,12 +544,6 @@ export class HomePage implements OnInit {
     await this.syncService.checkAuthStatus();
     await this.syncService.fetchCategories();
     event.target.complete();
-  }
-
-  simulateTransaction() {
-    const testMessages = this.smsParser.getTestMessages();
-    const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
-    this.smsListener.simulateSms(randomMessage.sender, randomMessage.message);
   }
 
   goToSettings() {

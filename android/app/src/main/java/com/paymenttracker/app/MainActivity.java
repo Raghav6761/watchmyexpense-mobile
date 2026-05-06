@@ -1,12 +1,9 @@
 package com.paymenttracker.app;
 
-import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(SmsReceiverPlugin.class);
-        super.onCreate(savedInstanceState);
-    }
+    // SmsReceiverPlugin registration removed with the SMS pivot.
+    // Capacitor's standard plugins (App, Browser, Preferences, etc.) are
+    // auto-registered via the capacitor.plugins.json manifest.
 }

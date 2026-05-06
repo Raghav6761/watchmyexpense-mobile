@@ -42,7 +42,6 @@ import {
 
 import { TransactionStorageService } from '../../services/transaction-storage.service';
 import { SyncService } from '../../services/sync.service';
-import { SmsListenerService } from '../../services/sms-listener.service';
 import { Capacitor } from '@capacitor/core';
 
 @Component({
@@ -198,30 +197,6 @@ import { Capacitor } from '@capacitor/core';
         </ion-item>
       </ion-list>
 
-      <!-- Permissions (Android only) -->
-      @if (isAndroid) {
-        <ion-list>
-          <ion-list-header>
-            <ion-label>Permissions</ion-label>
-          </ion-list-header>
-
-          <ion-item>
-            <ion-icon
-              slot="start"
-              [name]="hasOverlayPermission ? 'checkmark-circle-outline' : 'alert-circle-outline'"
-              [color]="hasOverlayPermission ? 'success' : 'warning'"
-            ></ion-icon>
-            <ion-label>
-              <h2>Display Over Other Apps</h2>
-              <p>Show transaction popup when app is in background</p>
-            </ion-label>
-            <ion-button slot="end" fill="outline" (click)="requestOverlayPermission()" [disabled]="hasOverlayPermission">
-              {{ hasOverlayPermission ? 'Granted' : 'Enable' }}
-            </ion-button>
-          </ion-item>
-        </ion-list>
-      }
-
       <!-- Data Management -->
       <ion-list>
         <ion-list-header>
@@ -304,11 +279,9 @@ export class SettingsPage {
 
   public storage = inject(TransactionStorageService);
   public syncService = inject(SyncService);
-  private smsListener = inject(SmsListenerService);
 
   yearStartMonth = 1;
   isAndroid = false;
-  hasOverlayPermission = false;
 
   // Month options for fiscal year dropdown
   readonly MONTHS = [
@@ -355,28 +328,8 @@ export class SettingsPage {
 
   ionViewWillEnter() {
     this.isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-
-    if (this.isAndroid) {
-      this.checkOverlayPermission();
-    }
-
     // Refresh year start month from storage
     this.yearStartMonth = this.storage.yearStartMonth();
-  }
-
-  async checkOverlayPermission() {
-    console.log('Checking overlay permission...');
-    this.hasOverlayPermission = await this.smsListener.checkOverlayPermission();
-    console.log('Overlay permission:', this.hasOverlayPermission);
-  }
-
-  async requestOverlayPermission() {
-    console.log('Requesting overlay permission...');
-    await this.smsListener.requestOverlayPermission();
-    await this.showToast('Please enable "Display over other apps" for Watch My Expense', 'primary');
-
-    // Check permission again after a delay (user returns from settings)
-    setTimeout(() => this.checkOverlayPermission(), 2000);
   }
 
   async saveYearStartMonth() {
