@@ -2,7 +2,6 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { TransactionStorageService } from './transaction-storage.service';
-import { SmsListenerService } from './sms-listener.service';
 import { AuthService } from './auth.service';
 import { Transaction, Categories, MasterLiability } from '../models/transaction.model';
 
@@ -32,7 +31,6 @@ export interface BatchSyncResponse {
 export class SyncService {
   private http = inject(HttpClient);
   private storage = inject(TransactionStorageService);
-  private smsListener = inject(SmsListenerService);
   private auth = inject(AuthService);
 
   // Reactive state
@@ -141,10 +139,6 @@ export class SyncService {
       });
       await this.storage.updateCategories(categories);
       console.log('[SyncService] Categories stored successfully');
-
-      // Also update native overlay categories
-      await this.smsListener.setCategories(categories.expense, categories.income);
-
       return categories;
     } catch (error) {
       console.error('[SyncService] Error fetching categories:', error);

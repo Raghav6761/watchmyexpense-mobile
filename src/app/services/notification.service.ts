@@ -1,9 +1,8 @@
 import { Injectable } from '@angular/core';
-import { LocalNotifications, ScheduleOptions, ActionPerformed } from '@capacitor/local-notifications';
+import { LocalNotifications, ActionPerformed } from '@capacitor/local-notifications';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Subject } from 'rxjs';
-import { ParsedSms } from '../models/transaction.model';
 
 export interface NotificationAction {
   transactionId: string;
@@ -170,58 +169,8 @@ export class NotificationService {
     return this.isAppInForeground;
   }
 
-  async showTransactionNotification(parsed: ParsedSms, transactionId: string): Promise<void> {
-    if (!Capacitor.isNativePlatform()) {
-      console.log('Notification (web):', parsed);
-      return;
-    }
-
-    // Don't show notification if app is in foreground - modal will show instead
-    if (this.isAppInForeground) {
-      console.log('App in foreground, skipping notification');
-      return;
-    }
-
-    const hasPermission = await this.checkPermission();
-    if (!hasPermission) {
-      console.log('No notification permission');
-      return;
-    }
-
-    const isExpense = parsed.type === 'expense';
-    const sign = isExpense ? '-' : '+';
-    const amount = `₹${parsed.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-
-    // Use transaction ID hash as notification ID so overlay can dismiss it
-    const notificationId = this.hashCode(transactionId);
-
-    const options: ScheduleOptions = {
-      notifications: [
-        {
-          id: notificationId,
-          title: `${isExpense ? '💸 Expense' : '💰 Income'}: ${sign}${amount}`,
-          body: `${parsed.merchant} • ${parsed.source}`,
-          channelId: 'transactions',
-          extra: {
-            transactionId,
-            type: parsed.type
-          },
-          actionTypeId: isExpense ? 'EXPENSE_ACTIONS' : 'INCOME_ACTIONS',
-          smallIcon: 'ic_stat_notify',
-          largeIcon: 'ic_launcher',
-          ongoing: false,
-          autoCancel: true
-        }
-      ]
-    };
-
-    try {
-      await LocalNotifications.schedule(options);
-      console.log('Transaction notification sent with action buttons');
-    } catch (error) {
-      console.error('Failed to send notification:', error);
-    }
-  }
+  // showTransactionNotification was removed with the SMS pivot. Will be reintroduced
+  // in Phase 2 with a different signature for smart, pattern-based reminders.
 
   async cancelNotification(id: number): Promise<void> {
     if (!Capacitor.isNativePlatform()) {

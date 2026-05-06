@@ -47,80 +47,10 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Overlay Service for floating transaction popup -->
-        <service
-            android:name=".OverlayService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Display transaction overlay when SMS received" />
-        </service>
-
-        <!-- Transparent activity for overlay -->
-        <activity
-            android:name=".TransactionOverlayActivity"
-            android:theme="@style/Theme.Transparent"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:launchMode="singleInstance"
-            android:exported="false" />
-
-        <!-- SMS Receiver - statically registered to work even when app is killed -->
-        <receiver
-            android:name=".SmsReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- SMS Monitor Service - keeps app alive for reliable SMS detection -->
-        <service
-            android:name=".SmsMonitorService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Monitor incoming SMS for bank transactions" />
-        </service>
-
-        <!-- Boot Receiver - auto-start monitoring after device boot -->
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Notification Action Receiver - handles notification button clicks -->
-        <receiver
-            android:name=".NotificationActionReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.watchmyexpense.ACTION_DISMISS" />
-            </intent-filter>
-        </receiver>
-
     </application>
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>
