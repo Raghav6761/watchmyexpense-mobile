@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import {
@@ -21,7 +21,7 @@ import {
 import { addIcons } from 'ionicons';
 import { receiptOutline, cashOutline } from 'ionicons/icons';
 
-import { AnalyticsService, MonthlyBudgetData } from '../../services/analytics.service';
+import { AnalyticsService } from '../../services/analytics.service';
 import { Transaction } from '../../models/transaction.model';
 
 @Component({
@@ -220,10 +220,17 @@ export class CategoryDetailPage implements OnInit {
     const month = this.analytics.selectedMonth();
     const snapshot = this.analytics.getMonthlySnapshot();
 
-    // Get transactions for this category
+    // Get transactions for this category. Match `groupByCategory()` in the
+    // analytics service: a transaction with no `category` is bucketed under
+    // the synthetic label "Uncategorized" — so when filtering for that label
+    // we must include rows where `category` is empty.
     const allMonthTxns = this.analytics.getTransactionsForMonth(year, month);
     this.transactions = allMonthTxns
-      .filter(t => t.type === this.type && t.category === this.categoryName)
+      .filter(t => {
+        if (t.type !== this.type) return false;
+        const cat = t.category || 'Uncategorized';
+        return cat === this.categoryName;
+      })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     this.totalAmount = this.transactions.reduce((sum, t) => sum + t.amount, 0);

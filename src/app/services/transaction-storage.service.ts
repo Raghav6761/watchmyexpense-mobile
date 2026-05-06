@@ -3,7 +3,6 @@ import { Preferences } from '@capacitor/preferences';
 import {
   Transaction,
   TransactionStatus,
-  ParsedSms,
   Categories,
   MasterLiability,
   DEFAULT_EXPENSE_CATEGORIES,
@@ -163,52 +162,6 @@ export class TransactionStorageService {
    */
   private generateId(): string {
     return `txn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  }
-
-  /**
-   * Create a transaction from parsed SMS
-   */
-  createFromParsedSms(parsed: ParsedSms): Transaction {
-    return {
-      id: this.generateId(),
-      type: parsed.type,
-      amount: parsed.amount,
-      date: parsed.date,
-      merchant: parsed.merchant,
-      description: parsed.merchant, // Default description to merchant
-      category: '', // To be filled by user
-      source: parsed.source,
-      status: 'pending',
-      rawSms: parsed.rawMessage,
-      createdAt: new Date()
-    };
-  }
-
-  /**
-   * Create a transaction from pending native transaction data
-   * Used for transactions detected while app was killed
-   */
-  createFromPending(pending: {
-    id: string;
-    amount: number;
-    type: 'expense' | 'income';
-    source: string;
-    rawMessage: string;
-    timestamp: number;
-  }): Transaction {
-    return {
-      id: pending.id,
-      type: pending.type,
-      amount: pending.amount,
-      date: new Date(pending.timestamp),
-      merchant: 'Transaction', // Native parsing doesn't extract merchant
-      description: 'Transaction', // To be filled by user
-      category: '', // To be filled by user
-      source: pending.source,
-      status: 'pending',
-      rawSms: pending.rawMessage,
-      createdAt: new Date(pending.timestamp)
-    };
   }
 
   /**

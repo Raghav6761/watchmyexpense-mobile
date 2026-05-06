@@ -9,21 +9,11 @@ export interface Transaction {
   merchant: string;
   description: string;
   category: string;
-  source: string; // SBI, HDFC CC, Axis CC, etc.
+  source: string; // Manual, HDFC CC, Axis CC, etc. — labels the funding source
   status: TransactionStatus;
-  rawSms?: string;
   errorMessage?: string;
   syncedAt?: Date;
   createdAt: Date;
-}
-
-export interface ParsedSms {
-  type: TransactionType;
-  amount: number;
-  date: Date;
-  merchant: string;
-  source: string;
-  rawMessage: string;
 }
 
 export interface Categories {
@@ -32,11 +22,12 @@ export interface Categories {
 }
 
 /**
- * One row from the user's Liability master register (Summary tab A41:E60).
- * Used by the SMS parser to recognize which card/loan an SMS belongs to.
+ * One row from the user's Liability master register (Summary tab E18:I38).
  *
- * sourceKeyword is comma-separated AND-tokens: "HDFC, 1525" means an SMS must
- * contain both "HDFC" and "1525" (case-insensitive substring) to match this card.
+ * sourceKeyword is comma-separated AND-tokens: "HDFC, 1525" matches a manually
+ * entered transaction whose source contains both tokens. Carried over from the
+ * SMS-era code path; still useful for auto-classification of manual transactions
+ * that label themselves with bank/card names.
  */
 export interface MasterLiability {
   name: string;
