@@ -1,0 +1,92 @@
+{
+  "name": "Watch My Expense",
+  "short_name": "WME",
+  "description": "Track your expenses in your own Google Sheet. Your data, your sheet, your control.",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "./",
+  "start_url": "./",
+  "background_color": "#000000",
+  "theme_color": "#009688",
+  "categories": ["finance", "productivity", "lifestyle"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add a transaction",
+      "short_name": "Add",
+      "description": "Quick-add a new expense or income entry",
+      "url": "./home?action=add",
+      "icons": [
+        { "src": "icons/icon-96x96.png", "sizes": "96x96" }
+      ]
+    },
+    {
+      "name": "Open Analytics",
+      "short_name": "Analytics",
+      "description": "View this month's spending breakdown",
+      "url": "./analytics",
+      "icons": [
+        { "src": "icons/icon-96x96.png", "sizes": "96x96" }
+      ]
+    },
+    {
+      "name": "Manage Liabilities",
+      "short_name": "Liabilities",
+      "description": "Track credit cards and loans",
+      "url": "./analytics?segment=liabilities",
+      "icons": [
+        { "src": "icons/icon-96x96.png", "sizes": "96x96" }
+      ]
+    }
+  ]
+}
