@@ -40,11 +40,14 @@ import {
   cloudUploadOutline,
   trashOutline,
   createOutline,
-  refreshOutline
+  refreshOutline,
+  downloadOutline,
+  closeOutline
 } from 'ionicons/icons';
 
 import { TransactionStorageService } from '../../services/transaction-storage.service';
 import { SyncService } from '../../services/sync.service';
+import { PwaInstallService } from '../../services/pwa-install.service';
 import { TransactionOverlayComponent } from '../../components/transaction-overlay/transaction-overlay.component';
 import { Transaction } from '../../models/transaction.model';
 
@@ -93,6 +96,32 @@ import { Transaction } from '../../models/transaction.model';
       <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
+
+      <!-- PWA Install banner. Two variants: Chromium auto-prompt + iOS manual. -->
+      @if (pwaInstall.shouldShowBanner()) {
+        <ion-card class="pwa-install-banner">
+          <ion-card-content>
+            <div class="pwa-install-row">
+              <ion-icon name="download-outline" class="pwa-install-icon"></ion-icon>
+              <div class="pwa-install-text">
+                @if (pwaInstall.canPromptInstall()) {
+                  <h3>Install Watch My Expense</h3>
+                  <p>Add to home screen for quicker access.</p>
+                } @else if (pwaInstall.isIOS()) {
+                  <h3>Add to Home Screen</h3>
+                  <p>Tap <strong>Share</strong> in Safari, then <strong>Add to Home Screen</strong>.</p>
+                }
+              </div>
+              @if (pwaInstall.canPromptInstall()) {
+                <ion-button size="small" (click)="installPwa()">Install</ion-button>
+              }
+              <ion-button fill="clear" size="small" (click)="dismissInstallBanner()" aria-label="Dismiss">
+                <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      }
 
       <!-- Stats Card -->
       <ion-card class="stats-card">
@@ -202,6 +231,50 @@ import { Transaction } from '../../models/transaction.model';
     </ion-content>
   `,
   styles: [`
+    .pwa-install-banner {
+      margin: 12px 16px 0;
+      border-left: 3px solid var(--ion-color-primary);
+
+      ion-card-content {
+        padding: 12px 16px;
+      }
+
+      .pwa-install-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .pwa-install-icon {
+        font-size: 24px;
+        color: var(--ion-color-primary);
+        flex-shrink: 0;
+      }
+
+      .pwa-install-text {
+        flex: 1;
+        min-width: 0;
+
+        h3 {
+          font-size: 14px;
+          font-weight: 600;
+          margin: 0;
+        }
+
+        p {
+          font-size: 12px;
+          color: var(--ion-color-medium);
+          margin: 2px 0 0;
+        }
+      }
+
+      ion-button {
+        flex-shrink: 0;
+        --padding-start: 12px;
+        --padding-end: 12px;
+      }
+    }
+
     .stats-card {
       margin: 16px;
 
@@ -331,6 +404,7 @@ export class HomePage implements OnInit {
 
   public storage = inject(TransactionStorageService);
   public syncService = inject(SyncService);
+  public pwaInstall = inject(PwaInstallService);
 
   constructor() {
     addIcons({
@@ -343,8 +417,18 @@ export class HomePage implements OnInit {
       cloudUploadOutline,
       trashOutline,
       createOutline,
-          refreshOutline
+      refreshOutline,
+      downloadOutline,
+      closeOutline
     });
+  }
+
+  async installPwa() {
+    await this.pwaInstall.promptInstall();
+  }
+
+  async dismissInstallBanner() {
+    await this.pwaInstall.dismiss();
   }
 
   async ngOnInit() {
