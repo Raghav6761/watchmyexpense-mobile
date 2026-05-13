@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { Browser } from '@capacitor/browser';
 import { Preferences } from '@capacitor/preferences';
 import { App, URLOpenListenerEvent } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 import { TransactionStorageService } from './transaction-storage.service';
 
@@ -108,15 +109,43 @@ export class AuthService {
 
   /**
    * Kick off Google OAuth. Opens the system browser; returns immediately.
-   * Completion is async — the deep-link listener (attachDeepLinkListener) sets
-   * the JWT once Google + backend redirect back.
+   *
+   * Completion is async and platform-dependent:
+   *   - Native (Android/iOS): backend redirects to `watchmyexpense://auth?jwt=...`,
+   *     Capacitor's appUrlOpen listener catches it (see attachDeepLinkListener).
+   *   - Web/PWA: backend redirects to `${WEB_BASE_URL}/auth/callback?jwt=...`,
+   *     the Angular AuthCallbackComponent extracts the JWT and stores it.
+   *
+   * We tell the backend which redirect to pick via the ?platform query.
    */
   async signIn(): Promise<void> {
     const baseUrl = this.storage.backendUrl();
+    const platform = Capacitor.isNativePlatform() ? 'mobile' : 'web';
     const { url } = await firstValueFrom(
-      this.http.get<{ url: string }>(`${baseUrl}/auth/url`)
+      this.http.get<{ url: string }>(`${baseUrl}/auth/url?platform=${platform}`)
     );
-    await Browser.open({ url });
+    if (Capacitor.isNativePlatform()) {
+      await Browser.open({ url });
+    } else {
+      // On web, redirect the current tab to Google. After OAuth completes the
+      // backend will redirect back to /auth/callback?jwt=... in this same tab.
+      // Browser.open in a PWA opens a popup and is blocked by some browsers,
+      // and the deep-link → app handoff doesn't apply on web anyway.
+      window.location.href = url;
+    }
+  }
+
+  /**
+   * Web-only: process a `?jwt=...` query param from the OAuth callback URL.
+   * Called by AuthCallbackComponent on /auth/callback. Mirrors the mobile
+   * deep-link path: set the signal before awaiting Preferences.set to avoid
+   * the race with /auth/status checks that fire during foreground transitions.
+   */
+  async handleWebCallbackJwt(jwt: string): Promise<void> {
+    if (!jwt) return;
+    this._jwt.set(jwt);
+    await Preferences.set({ key: STORAGE_KEYS.JWT, value: jwt });
+    await this.refreshStatus();
   }
 
   async signOut(): Promise<void> {

@@ -15,8 +15,14 @@ const STORAGE_KEYS = {
   LIABILITIES: 'payment_tracker_liabilities_master',
   BACKEND_URL: 'payment_tracker_backend_url',
   SHEET_NAME_PATTERN: 'payment_tracker_sheet_pattern',
-  YEAR_START_MONTH: 'payment_tracker_year_start_month'
+  YEAR_START_MONTH: 'payment_tracker_year_start_month',
+  CURRENCY: 'payment_tracker_currency'
 };
+
+// Locales recognized by the Angular currency pipe + matching backend pattern.
+// Keep in sync with CURRENCY_PATTERNS on the backend.
+export const SUPPORTED_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'SGD', 'AED'] as const;
+export type CurrencyCode = typeof SUPPORTED_CURRENCIES[number];
 
 @Injectable({
   providedIn: 'root'
@@ -32,6 +38,7 @@ export class TransactionStorageService {
   private _backendUrl = signal<string>('https://api.watchmyexpense.com');
   private _sheetNamePattern = signal<string>('Monthly budget {month} {year}');
   private _yearStartMonth = signal<number>(1); // 1=January, 4=April, etc.
+  private _currency = signal<CurrencyCode>('INR');
 
   // Public readonly signals
   public transactions = this._transactions.asReadonly();
@@ -40,6 +47,7 @@ export class TransactionStorageService {
   public backendUrl = this._backendUrl.asReadonly();
   public sheetNamePattern = this._sheetNamePattern.asReadonly();
   public yearStartMonth = this._yearStartMonth.asReadonly();
+  public currency = this._currency.asReadonly();
 
   // Computed values
   public pendingCount = computed(() =>
@@ -137,6 +145,12 @@ export class TransactionStorageService {
       });
       if (yearStartMonth) {
         this._yearStartMonth.set(parseInt(yearStartMonth, 10));
+      }
+
+      // Load currency preference
+      const { value: currency } = await Preferences.get({ key: STORAGE_KEYS.CURRENCY });
+      if (currency && SUPPORTED_CURRENCIES.includes(currency as CurrencyCode)) {
+        this._currency.set(currency as CurrencyCode);
       }
     } catch (error) {
       console.error('Error loading from storage:', error);
@@ -300,6 +314,19 @@ export class TransactionStorageService {
     await Preferences.set({
       key: STORAGE_KEYS.YEAR_START_MONTH,
       value: month.toString()
+    });
+  }
+
+  /**
+   * Update preferred currency. The mobile app uses this for display formatting.
+   * Caller should also POST to /api/config/currency so the backend remembers it
+   * and applies the right format on newly-created sheets.
+   */
+  async setCurrency(code: CurrencyCode): Promise<void> {
+    this._currency.set(code);
+    await Preferences.set({
+      key: STORAGE_KEYS.CURRENCY,
+      value: code
     });
   }
 

@@ -40,7 +40,7 @@ import {
   cardOutline
 } from 'ionicons/icons';
 
-import { TransactionStorageService } from '../../services/transaction-storage.service';
+import { TransactionStorageService, SUPPORTED_CURRENCIES, CurrencyCode } from '../../services/transaction-storage.service';
 import { SyncService } from '../../services/sync.service';
 import { Capacitor } from '@capacitor/core';
 
@@ -195,6 +195,26 @@ import { Capacitor } from '@capacitor/core';
             <p class="pattern-preview">Sheet name: <strong>{{ sheetNamePreview }}</strong></p>
           </ion-label>
         </ion-item>
+
+        <ion-item>
+          <ion-icon name="cash-outline" slot="start"></ion-icon>
+          <ion-select
+            label="Currency"
+            labelPlacement="stacked"
+            [(ngModel)]="currency"
+            (ionChange)="saveCurrency()"
+          >
+            @for (c of CURRENCIES; track c) {
+              <ion-select-option [value]="c">{{ c }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+
+        <ion-item>
+          <ion-label class="ion-text-wrap">
+            <p class="pattern-preview">Affects display + the format of newly-created sheets. Existing sheets keep their format.</p>
+          </ion-label>
+        </ion-item>
       </ion-list>
 
       <!-- Data Management -->
@@ -281,6 +301,7 @@ export class SettingsPage {
   public syncService = inject(SyncService);
 
   yearStartMonth = 1;
+  currency: CurrencyCode = 'INR';
   isAndroid = false;
 
   // Month options for fiscal year dropdown
@@ -292,6 +313,8 @@ export class SettingsPage {
     { value: 9, label: 'September' }, { value: 10, label: 'October' },
     { value: 11, label: 'November' }, { value: 12, label: 'December' }
   ];
+
+  readonly CURRENCIES = SUPPORTED_CURRENCIES;
 
   constructor() {
     addIcons({
@@ -328,8 +351,21 @@ export class SettingsPage {
 
   ionViewWillEnter() {
     this.isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-    // Refresh year start month from storage
+    // Refresh year start month + currency from storage
     this.yearStartMonth = this.storage.yearStartMonth();
+    this.currency = this.storage.currency();
+  }
+
+  async saveCurrency() {
+    const result = await this.syncService.updateCurrency(this.currency);
+    if (result.success) {
+      await this.showToast(`Currency set to ${this.currency}`, 'success');
+    } else {
+      // Backend failed (offline or not authenticated) — local change still applied
+      // via storage.setCurrency in updateCurrency, so display is current.
+      await this.showToast('Saved locally. Will sync when online.', 'warning');
+      await this.storage.setCurrency(this.currency);
+    }
   }
 
   async saveYearStartMonth() {

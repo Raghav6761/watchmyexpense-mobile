@@ -188,6 +188,27 @@ export class SyncService {
   }
 
   /**
+   * Update preferred currency on backend + locally. New sheets will use this
+   * currency for cell formatting; existing sheets keep their own format.
+   */
+  async updateCurrency(currency: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await firstValueFrom(
+        this.http.post<{ success: boolean; currency: string }>(
+          `${this.baseUrl}/api/config/currency`,
+          { currency }
+        )
+      );
+      await this.storage.setCurrency(currency as any);
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('Error updating currency:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update';
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
    * Get current backend configuration
    */
   async getBackendConfig(): Promise<{

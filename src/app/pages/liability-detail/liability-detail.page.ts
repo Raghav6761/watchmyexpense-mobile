@@ -77,15 +77,15 @@ interface MonthlyLiability {
             </div>
             <div class="stats-grid">
               <div class="stat-item">
-                <span class="stat-value expense-color">{{ monthly().spent | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                <span class="stat-value expense-color">{{ monthly().spent | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 <span class="stat-label">Spent</span>
               </div>
               <div class="stat-item">
-                <span class="stat-value income-color">{{ monthly().paid | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                <span class="stat-value income-color">{{ monthly().paid | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 <span class="stat-label">Paid</span>
               </div>
               <div class="stat-item">
-                <span class="stat-value danger-color">{{ monthly().outstanding | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                <span class="stat-value danger-color">{{ monthly().outstanding | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 <span class="stat-label">Outstanding</span>
               </div>
               <div class="stat-item">
@@ -99,7 +99,7 @@ interface MonthlyLiability {
                   <span><strong>Due:</strong> {{ monthly().dueDate }}</span>
                 }
                 @if (monthly().minDue) {
-                  <span><strong>Min:</strong> {{ monthly().minDue | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                  <span><strong>Min:</strong> {{ monthly().minDue | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 }
               </div>
             }
@@ -114,7 +114,7 @@ interface MonthlyLiability {
                 @if (master()!.creditLimit) {
                   <div class="meta-item">
                     <span class="meta-label">Limit</span>
-                    <span class="meta-value">{{ master()!.creditLimit | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="meta-value">{{ master()!.creditLimit | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                   </div>
                 }
                 @if (master()!.interestRate) {
@@ -151,7 +151,7 @@ interface MonthlyLiability {
                       <p>{{ txn.date | date:'dd MMM yyyy' }}{{ txn.category ? ' &middot; ' + txn.category : '' }}</p>
                     </ion-label>
                     <ion-note slot="end" class="expense-color">
-                      {{ txn.amount | currency:'INR':'symbol-narrow':'1.0-0' }}
+                      {{ txn.amount | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                     </ion-note>
                   </ion-item>
                 }
@@ -265,7 +265,7 @@ interface MonthlyLiability {
 export class LiabilityDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
   private analytics = inject(AnalyticsService);
-  private storage = inject(TransactionStorageService);
+  public storage = inject(TransactionStorageService);
   private http = inject(HttpClient);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);

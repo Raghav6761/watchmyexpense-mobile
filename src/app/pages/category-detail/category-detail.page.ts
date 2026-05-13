@@ -22,6 +22,7 @@ import { addIcons } from 'ionicons';
 import { receiptOutline, cashOutline } from 'ionicons/icons';
 
 import { AnalyticsService } from '../../services/analytics.service';
+import { TransactionStorageService } from '../../services/transaction-storage.service';
 import { Transaction } from '../../models/transaction.model';
 
 @Component({
@@ -50,7 +51,7 @@ import { Transaction } from '../../models/transaction.model';
           <div class="stats-grid">
             <div class="stat-item">
               <span class="stat-value" [class]="type === 'expense' ? 'expense-color' : 'income-color'">
-                {{ totalAmount | currency:'INR':'symbol-narrow':'1.0-0' }}
+                {{ totalAmount | currency:storage.currency():'symbol-narrow':'1.0-0' }}
               </span>
               <span class="stat-label">Total</span>
             </div>
@@ -63,7 +64,7 @@ import { Transaction } from '../../models/transaction.model';
               <span class="stat-label">Transactions</span>
             </div>
             <div class="stat-item">
-              <span class="stat-value">{{ avgPerTransaction | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+              <span class="stat-value">{{ avgPerTransaction | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
               <span class="stat-label">Average</span>
             </div>
           </div>
@@ -77,7 +78,7 @@ import { Transaction } from '../../models/transaction.model';
             <div class="budget-header">
               <span class="budget-title">Budget</span>
               <span [class.over-budget]="totalAmount > budgetPlanned">
-                {{ totalAmount | currency:'INR':'symbol-narrow':'1.0-0' }} of {{ budgetPlanned | currency:'INR':'symbol-narrow':'1.0-0' }}
+                {{ totalAmount | currency:storage.currency():'symbol-narrow':'1.0-0' }} of {{ budgetPlanned | currency:storage.currency():'symbol-narrow':'1.0-0' }}
               </span>
             </div>
             <ion-progress-bar
@@ -86,11 +87,11 @@ import { Transaction } from '../../models/transaction.model';
             </ion-progress-bar>
             @if (totalAmount > budgetPlanned) {
               <div class="budget-warning">
-                Over budget by {{ totalAmount - budgetPlanned | currency:'INR':'symbol-narrow':'1.0-0' }}
+                Over budget by {{ totalAmount - budgetPlanned | currency:storage.currency():'symbol-narrow':'1.0-0' }}
               </div>
             } @else {
               <div class="budget-remaining">
-                {{ budgetPlanned - totalAmount | currency:'INR':'symbol-narrow':'1.0-0' }} remaining
+                {{ budgetPlanned - totalAmount | currency:storage.currency():'symbol-narrow':'1.0-0' }} remaining
               </div>
             }
           </ion-card-content>
@@ -111,7 +112,7 @@ import { Transaction } from '../../models/transaction.model';
                     <p>{{ txn.date | date:'dd MMM yyyy' }}{{ txn.source ? ' - ' + txn.source : '' }}</p>
                   </ion-label>
                   <ion-note slot="end" [class]="type === 'expense' ? 'expense-color' : 'income-color'">
-                    {{ txn.amount | currency:'INR':'symbol-narrow':'1.0-0' }}
+                    {{ txn.amount | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                   </ion-note>
                 </ion-item>
               }
@@ -191,6 +192,7 @@ import { Transaction } from '../../models/transaction.model';
 export class CategoryDetailPage implements OnInit {
   private route = inject(ActivatedRoute);
   private analytics = inject(AnalyticsService);
+  public storage = inject(TransactionStorageService);
 
   Math = Math;
 

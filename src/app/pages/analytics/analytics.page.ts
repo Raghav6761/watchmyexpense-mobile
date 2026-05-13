@@ -116,13 +116,13 @@ Chart.register(...registerables);
               <div class="balance-row">
                 <div class="balance-item">
                   <span class="balance-label">Start Balance</span>
-                  <span class="balance-value">{{ balance()!.startBalance | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                  <span class="balance-value">{{ balance()!.startBalance | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 </div>
                 <ion-icon name="chevron-forward-outline" class="balance-arrow"></ion-icon>
                 <div class="balance-item">
                   <span class="balance-label">End Balance</span>
                   <span class="balance-value" [class.positive]="balance()!.endBalance >= balance()!.startBalance" [class.negative]="balance()!.endBalance < balance()!.startBalance">
-                    {{ balance()!.endBalance | currency:'INR':'symbol-narrow':'1.0-0' }}
+                    {{ balance()!.endBalance | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                   </span>
                 </div>
               </div>
@@ -135,7 +135,7 @@ Chart.register(...registerables);
           <ion-card class="summary-card expense-card">
             <ion-card-content>
               <ion-icon name="trending-down-outline" class="card-icon expense-icon"></ion-icon>
-              <span class="card-amount">{{ snapshot()!.totalExpenses | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+              <span class="card-amount">{{ snapshot()!.totalExpenses | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
               <span class="card-label">Spent</span>
             </ion-card-content>
           </ion-card>
@@ -143,7 +143,7 @@ Chart.register(...registerables);
           <ion-card class="summary-card income-card">
             <ion-card-content>
               <ion-icon name="trending-up-outline" class="card-icon income-icon"></ion-icon>
-              <span class="card-amount">{{ snapshot()!.totalIncome | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+              <span class="card-amount">{{ snapshot()!.totalIncome | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
               <span class="card-label">Earned</span>
             </ion-card-content>
           </ion-card>
@@ -152,7 +152,7 @@ Chart.register(...registerables);
             <ion-card-content>
               <ion-icon name="wallet-outline" class="card-icon savings-icon"></ion-icon>
               <span class="card-amount" [class.positive]="snapshot()!.netSavings >= 0" [class.negative]="snapshot()!.netSavings < 0">
-                {{ snapshot()!.netSavings | currency:'INR':'symbol-narrow':'1.0-0' }}
+                {{ snapshot()!.netSavings | currency:storage.currency():'symbol-narrow':'1.0-0' }}
               </span>
               <span class="card-label">Saved</span>
             </ion-card-content>
@@ -199,7 +199,7 @@ Chart.register(...registerables);
                         <p>{{ cat.count }} transaction{{ cat.count > 1 ? 's' : '' }}</p>
                       </ion-label>
                       <ion-note slot="end" class="expense-amount">
-                        {{ cat.amount | currency:'INR':'symbol-narrow':'1.0-0' }}
+                        {{ cat.amount | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                         <br><small>{{ cat.percentage | number:'1.1-1' }}%</small>
                       </ion-note>
                     </ion-item>
@@ -231,7 +231,7 @@ Chart.register(...registerables);
                         <p>{{ cat.count }} transaction{{ cat.count > 1 ? 's' : '' }}</p>
                       </ion-label>
                       <ion-note slot="end" class="income-amount">
-                        {{ cat.amount | currency:'INR':'symbol-narrow':'1.0-0' }}
+                        {{ cat.amount | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                         <br><small>{{ cat.percentage | number:'1.1-1' }}%</small>
                       </ion-note>
                     </ion-item>
@@ -284,9 +284,9 @@ Chart.register(...registerables);
                     </div>
                     <div class="budget-values">
                       <span [class.over-budget]="item.diff < 0">
-                        {{ item.actual | currency:'INR':'symbol-narrow':'1.0-0' }}
+                        {{ item.actual | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                       </span>
-                      <span class="budget-planned">/ {{ item.planned | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                      <span class="budget-planned">/ {{ item.planned | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                     </div>
                   </div>
                 }
@@ -310,8 +310,8 @@ Chart.register(...registerables);
                       </ion-progress-bar>
                     </div>
                     <div class="budget-values">
-                      <span>{{ item.actual | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
-                      <span class="budget-planned">/ {{ item.planned | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                      <span>{{ item.actual | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
+                      <span class="budget-planned">/ {{ item.planned | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                     </div>
                   </div>
                 }
@@ -354,7 +354,7 @@ Chart.register(...registerables);
                 <!-- Total Outstanding summary row -->
                 <div class="liability-total-row">
                   <span class="liability-total-label">Total Outstanding</span>
-                  <span class="liability-total-value">{{ totalLiabilities() | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                  <span class="liability-total-value">{{ totalLiabilities() | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                 </div>
 
                 <!-- Per-card list. Tap a row to update Paid / Due / Min Due. -->
@@ -370,22 +370,22 @@ Chart.register(...registerables);
                           <h3>{{ card.name }}</h3>
                           <p class="liability-meta">
                             @if (card.creditLimit) {
-                              Limit: {{ card.creditLimit | currency:'INR':'symbol-narrow':'1.0-0' }}
+                              Limit: {{ card.creditLimit | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                             }
                             @if (card.billingCycle) {
                               &middot; {{ card.billingCycle }}
                             }
                           </p>
                           <p class="liability-stats-line">
-                            Spent {{ card.spent | currency:'INR':'symbol-narrow':'1.0-0' }}
-                            &middot; Paid <span class="paid-value">{{ card.paid | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                            Spent {{ card.spent | currency:storage.currency():'symbol-narrow':'1.0-0' }}
+                            &middot; Paid <span class="paid-value">{{ card.paid | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                           </p>
                           @if (card.sourceKeyword) {
                             <p class="source-hint">Auto-tracks: "{{ card.sourceKeyword }}"</p>
                           }
                         </ion-label>
                         <ion-note slot="end" class="liability-amount">
-                          {{ card.outstanding | currency:'INR':'symbol-narrow':'1.0-0' }}
+                          {{ card.outstanding | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                           <br><small>outstanding</small>
                         </ion-note>
                       </ion-item>
@@ -456,7 +456,7 @@ Chart.register(...registerables);
                 @for (cat of topCategories; track cat.category) {
                   <div class="top-cat-row">
                     <span class="top-cat-name">{{ cat.category }}</span>
-                    <span class="top-cat-avg">{{ cat.avgAmount | currency:'INR':'symbol-narrow':'1.0-0' }}/mo</span>
+                    <span class="top-cat-avg">{{ cat.avgAmount | currency:storage.currency():'symbol-narrow':'1.0-0' }}/mo</span>
                   </div>
                 }
               </ion-card-content>
@@ -680,7 +680,7 @@ Chart.register(...registerables);
 export class AnalyticsPage implements OnInit {
   private router = inject(Router);
   private http = inject(HttpClient);
-  private storage = inject(TransactionStorageService);
+  public storage = inject(TransactionStorageService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
   analytics = inject(AnalyticsService);

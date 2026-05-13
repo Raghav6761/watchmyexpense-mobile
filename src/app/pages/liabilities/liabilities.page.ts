@@ -100,7 +100,7 @@ interface MonthlyLiability {
                   <h2>{{ item.name }}</h2>
                   <p>
                     @if (item.creditLimit) {
-                      Limit: {{ item.creditLimit | currency:'INR':'symbol-narrow':'1.0-0' }}
+                      Limit: {{ item.creditLimit | currency:storage.currency():'symbol-narrow':'1.0-0' }}
                     }
                     @if (item.interestRate) {
                       &middot; {{ item.interestRate }}% APR
@@ -151,19 +151,19 @@ interface MonthlyLiability {
                 <div class="monthly-grid">
                   <div class="grid-item">
                     <span class="grid-label">Spent</span>
-                    <span class="grid-value">{{ item.spent | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="grid-value">{{ item.spent | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                   </div>
                   <div class="grid-item">
                     <span class="grid-label">Paid</span>
-                    <span class="grid-value paid">{{ item.paid | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="grid-value paid">{{ item.paid | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                   </div>
                   <div class="grid-item">
                     <span class="grid-label">Outstanding</span>
-                    <span class="grid-value outstanding">{{ item.outstanding | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="grid-value outstanding">{{ item.outstanding | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                   </div>
                   <div class="grid-item">
                     <span class="grid-label">Min Due</span>
-                    <span class="grid-value">{{ item.minDue | currency:'INR':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="grid-value">{{ item.minDue | currency:storage.currency():'symbol-narrow':'1.0-0' }}</span>
                   </div>
                 </div>
                 <ion-button expand="block" fill="outline" size="small" (click)="updateMonthly(item)">
@@ -235,7 +235,7 @@ interface MonthlyLiability {
 })
 export class LiabilitiesPage implements OnInit {
   private http = inject(HttpClient);
-  private storage = inject(TransactionStorageService);
+  public storage = inject(TransactionStorageService);
   private alertCtrl = inject(AlertController);
   private toastCtrl = inject(ToastController);
 
