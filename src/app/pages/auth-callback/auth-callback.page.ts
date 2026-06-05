@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { IonContent, IonSpinner } from '@ionic/angular/standalone';
 
 import { AuthService } from '../../services/auth.service';
+import { SyncService } from '../../services/sync.service';
 
 /**
  * Web-only post-OAuth landing page.
@@ -41,6 +42,7 @@ export class AuthCallbackPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private auth = inject(AuthService);
+  private syncService = inject(SyncService);
 
   async ngOnInit() {
     // Wait for AuthService to finish loading any persisted state. Avoids a
@@ -51,6 +53,20 @@ export class AuthCallbackPage implements OnInit {
     const jwt = this.route.snapshot.queryParamMap.get('jwt');
     if (jwt) {
       await this.auth.handleWebCallbackJwt(jwt);
+
+      // AppComponent's initializeApp() ran at boot — before the JWT existed —
+      // so its post-auth bootstrap (categories + liability master register)
+      // was skipped. We re-run it here so the rest of the app sees the right
+      // data the moment the user lands on Home.
+      try {
+        await Promise.all([
+          this.syncService.fetchCategories(),
+          this.syncService.fetchLiabilitiesMaster()
+        ]);
+      } catch (err) {
+        // Non-fatal — Home will fall back to cached/default categories.
+        console.warn('[AuthCallback] Post-auth bootstrap failed:', err);
+      }
     }
 
     // Strip the JWT from the URL bar (don't want it lingering in history) and
